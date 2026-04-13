@@ -9,12 +9,9 @@ export default function Login() {
   const { login, register, guestLogin } = useUser();
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
-    confirmPassword: '',
-    name: ''
+    password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [mode, setMode] = useState('login');
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -31,36 +28,42 @@ export default function Login() {
       return;
     }
 
-    if (mode === 'register') {
-      if (formData.password.length < 6) {
-        setErrors({ password: 'Password must be at least 6 characters.' });
-        return;
-      }
-      if (formData.password !== formData.confirmPassword) {
-        setErrors({ confirmPassword: 'Passwords do not match.' });
-        return;
-      }
+    if (formData.password.length < 6) {
+      setErrors({ password: 'Password must be at least 6 characters.' });
+      return;
     }
 
     setIsLoading(true);
+    console.log('Starting sign in process for:', formData.email);
 
     try {
-      if (mode === 'register') {
-        await register(formData.email, formData.password, formData.name);
-        await login(formData.email, formData.password);
-      } else {
-        await login(formData.email, formData.password);
-      }
+      console.log('Attempting login...');
+      await login(formData.email, formData.password);
+      console.log('Login successful, navigating to home');
       navigate('/home');
     } catch (error) {
-      setErrors({ general: error.message });
+      console.log('Login failed:', error.message);
+      if (error.message.includes('No account found')) {
+        try {
+          console.log('Creating new account...');
+          await register(formData.email, formData.password);
+          console.log('Account created, navigating to home');
+          navigate('/home');
+        } catch (registerError) {
+          console.error('Registration failed:', registerError);
+          setErrors({ general: registerError.message });
+        }
+      } else {
+        console.error('Login error:', error);
+        setErrors({ general: error.message });
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center relative overflow-hidden bg-dark-900 selection:bg-primary-500/30">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center relative overflow-hidden bg-dark-900 selection:bg-primary-500/30 py-8">
       
       {/* Background Elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary-600/20 rounded-full blur-[120px] pointer-events-none"></div>
@@ -73,28 +76,11 @@ export default function Login() {
         className="w-full max-w-md px-6 z-10"
       >
         
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 mb-6 mx-auto text-sm font-bold text-slate-200">
-            <button
-              type="button"
-              onClick={() => setMode('login')}
-              className={`rounded-full px-4 py-2 transition ${mode === 'login' ? 'bg-primary-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-            >
-              Login
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('register')}
-              className={`rounded-full px-4 py-2 transition ${mode === 'register' ? 'bg-primary-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-            >
-              Register
-            </button>
-          </div>
-
-          <h1 className="text-4xl lg:text-5xl font-black text-white leading-[1.1] tracking-tight mb-4">
-            {mode === 'register' ? 'Create your AisleBe account' : 'Welcome back to AisleBe'}
+        <div className="text-center mb-6 max-w-xl mx-auto px-4">
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-white leading-tight tracking-tight mb-3">
+            Welcome back to AisleBe
           </h1>
-          <p className="text-slate-400 text-lg">{mode === 'register' ? 'Create an account or continue as guest to personalize your stadium journey.' : 'Sign in to access your stadium experience or continue as guest.'}</p>
+          <p className="text-slate-400 text-lg">Sign in to access your stadium experience or continue as guest.</p>
         </div>
 
         <motion.div 
@@ -143,28 +129,10 @@ export default function Login() {
               </div>
             </motion.div>
 
-            {mode === 'register' && (
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.6, delay: 0.6 }}
-              >
-                <label className="block text-sm font-bold text-slate-300 mb-2">Name</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-slate-400 focus:outline-none focus:border-primary-500 transition-colors"
-                  placeholder="Enter your full name"
-                  required={mode === 'register'}
-                />
-              </motion.div>
-            )}
-
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: mode === 'register' ? 0.8 : 0.6 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
             >
               <label className="block text-sm font-bold text-slate-300 mb-2">Password</label>
               <div className="relative">
@@ -185,34 +153,16 @@ export default function Login() {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+              {errors.password && (
+                <motion.p 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-red-400 text-sm mt-1"
+                >
+                  {errors.password}
+                </motion.p>
+              )}
             </motion.div>
-
-            {mode === 'register' && (
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.6, delay: 1.0 }}
-              >
-                <label className="block text-sm font-bold text-slate-300 mb-2">Confirm Password</label>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                  className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-slate-400 focus:outline-none focus:border-primary-500 transition-colors"
-                  placeholder="Confirm your password"
-                  required={mode === 'register'}
-                />
-                {errors.confirmPassword && (
-                  <motion.p 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-red-400 text-sm mt-1"
-                  >
-                    {errors.confirmPassword}
-                  </motion.p>
-                )}
-              </motion.div>
-            )}
 
             <motion.button
               initial={{ opacity: 0, y: 20 }}
@@ -224,7 +174,7 @@ export default function Login() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {isLoading ? (mode === 'register' ? 'Creating account...' : 'Signing In...') : (mode === 'register' ? 'Create account' : 'Sign In')}
+              {isLoading ? 'Signing In...' : 'Sign In'}
               {!isLoading && <ArrowRight size={20} />}
             </motion.button>
           </form>
@@ -248,15 +198,6 @@ export default function Login() {
             >
               Continue as Guest
             </button>
-            <p className="text-slate-400 text-sm">
-              {mode === 'register' ? 'Already have an account?' : 'Need an account?'}
-              <button 
-                onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-                className="text-primary-400 hover:text-primary-300 ml-1 font-bold"
-              >
-                {mode === 'login' ? 'Register' : 'Login'}
-              </button>
-            </p>
             <p className="text-slate-400 text-sm">
               Or <button 
                 onClick={() => navigate('/onboarding')}

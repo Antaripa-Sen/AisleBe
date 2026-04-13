@@ -18,8 +18,17 @@ export default function Home() {
   const navigate = useNavigate();
   const [detectedGate, setDetectedGate] = useState(userState?.gate || '');
 
-  const { matchInfo, gates } = gameState.venue;
-  const gatesList = Object.entries(gates || {}).map(([name, gate]) => ({ name, ...gate }));
+  const { matchInfo, gates } = gameState?.venue || {
+    matchInfo: { homeTeam: 'Loading', awayTeam: 'Loading', homeScore: 0, awayScore: 0, minute: 0 },
+    gates: {}
+  };
+  const alerts = gameState?.alerts || [];
+  const gatesList = Object.entries(gates || {}).reduce((acc, [name, gate]) => {
+    if (gate && typeof gate === 'object') {
+      acc.push({ name, ...gate });
+    }
+    return acc;
+  }, []);
 
   useEffect(() => {
     if (userState?.gate || !navigator.geolocation || !gatesList.length) return;
@@ -52,16 +61,16 @@ export default function Home() {
   }, [gatesList.length, saveUser, userState?.gate]);
 
   const gateLevels = gatesList.map((gate) => {
-    if (gate.crowdLevel === 'high') return 85;
-    if (gate.crowdLevel === 'medium') return 55;
+    if (gate?.crowdLevel === 'high') return 85;
+    if (gate?.crowdLevel === 'medium') return 55;
     return 30;
   });
 
   const crowdPercentage = gateLevels.length
     ? Math.round(gateLevels.reduce((sum, value) => sum + value, 0) / gateLevels.length)
-    : null;
+    : 0;
 
-  const crowdLabel = crowdPercentage === null ? 'Loading' : crowdPercentage > 75 ? 'Busy' : crowdPercentage > 45 ? 'Moderate' : 'Light';
+  const crowdLabel = crowdPercentage > 75 ? 'Busy' : crowdPercentage > 45 ? 'Moderate' : 'Light';
   const radius = 60;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (crowdPercentage / 100) * circumference;
@@ -69,10 +78,7 @@ export default function Home() {
   const lowCrowdGate = gatesList.length
     ? gatesList.reduce((best, gate) => {
         const score = { low: 3, medium: 2, high: 1 };
-        return score[gate.crowdLevel] > score[best.crowdLevel] ? gate : best;
-      }, gatesList[0])
-    : null;
-
+          return score[gate?.crowdLevel || 'low'] > score[best?.crowdLevel || 'low'] ? gate : best;
   const smartSuggestionGate = userState?.gate || detectedGate || lowCrowdGate?.name || null;
   const smartSuggestionData = smartSuggestionGate ? (gates?.[smartSuggestionGate] || { crowdLevel: 'low' }) : null;
   const smartSuggestionText = smartSuggestionData?.crowdLevel === 'high'
@@ -103,9 +109,9 @@ export default function Home() {
     <div className="h-full flex flex-col p-4 md:p-8 lg:p-12 xl:max-w-[1600px] xl:mx-auto w-full relative z-10">
       
       {/* Alerts Overlay */}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full poiner-events-none">
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
         <AnimatePresence>
-          {gameState.alerts.map(alert => (
+          {alerts.map(alert => (
             <motion.div
               key={alert.id}
               initial={{ opacity: 0, x: 50, scale: 0.9 }}

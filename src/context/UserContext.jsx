@@ -9,7 +9,26 @@ export const useUser = () => useContext(UserContext);
 
 const loadAccounts = () => {
   const saved = localStorage.getItem(ACCOUNTS_KEY);
-  return saved ? JSON.parse(saved) : [];
+  if (!saved) return [];
+  try {
+    return JSON.parse(saved);
+  } catch (error) {
+    console.warn('Unable to parse saved accounts, resetting storage.', error);
+    localStorage.removeItem(ACCOUNTS_KEY);
+    return [];
+  }
+};
+
+const loadUserState = () => {
+  const savedInfo = localStorage.getItem(USER_KEY);
+  if (!savedInfo) return null;
+  try {
+    return JSON.parse(savedInfo);
+  } catch (error) {
+    console.warn('Unable to parse saved user state, resetting storage.', error);
+    localStorage.removeItem(USER_KEY);
+    return null;
+  }
 };
 
 const saveAccounts = (accounts) => {
@@ -17,10 +36,7 @@ const saveAccounts = (accounts) => {
 };
 
 export const UserProvider = ({ children }) => {
-  const [userState, setUserState] = useState(() => {
-    const savedInfo = localStorage.getItem(USER_KEY);
-    return savedInfo ? JSON.parse(savedInfo) : null;
-  });
+  const [userState, setUserState] = useState(() => loadUserState());
 
   const [accounts, setAccounts] = useState(() => loadAccounts());
   const [theme, setTheme] = useState(() => localStorage.getItem(THEME_KEY) || 'dark');
@@ -59,6 +75,11 @@ export const UserProvider = ({ children }) => {
     const nextAccounts = [...accounts, newAccount];
     setAccounts(nextAccounts);
     saveAccounts(nextAccounts);
+    persistUser({
+      ...newAccount,
+      isLoggedIn: true,
+      loginTime: new Date().toISOString()
+    });
     return newAccount;
   };
 
