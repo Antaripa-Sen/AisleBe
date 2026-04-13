@@ -131,6 +131,24 @@ export default function MapScreen() {
           .addTo(map.current);
       }
 
+      // Add markers for all gates
+      Object.entries(gameState.venue.gates || {}).forEach(([gateName, gate]) => {
+        const coords = GATE_COORDS[gateName];
+        if (coords) {
+          const color = gate.crowdLevel === 'high' ? '#ef4444' : gate.crowdLevel === 'medium' ? '#f97316' : '#22c55e';
+          new maptilersdk.Marker({ color })
+            .setLngLat(coords)
+            .setPopup(new maptilersdk.Popup({ offset: 25 }).setHTML(`
+              <div class="text-sm">
+                <strong>${gateName}</strong><br>
+                Crowd: ${gate.crowdLevel}<br>
+                Status: ${gate.status || 'Open'}
+              </div>
+            `))
+            .addTo(map.current);
+        }
+      });
+
       new maptilersdk.Marker({ color: '#f97316' })
         .setLngLat(gateCoords)
         .setPopup(new maptilersdk.Popup({ offset: 25 }).setText(`${currentGate} entry`))

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, Coffee, DoorOpen, Bell } from 'lucide-react';
+import { Navigation, Coffee, DoorOpen, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { useSimulation } from '../context/SimulationContext';
@@ -16,13 +16,33 @@ export default function Home() {
   const { userState, saveUser } = useUser();
   const { gameState, dismissAlert } = useSimulation();
   const navigate = useNavigate();
-  const [detectedGate, setDetectedGate] = useState(userState?.gate || '');
+
+  // ✅ FIX 1: detectedGate was used but never declared — added here
+  const [detectedGate, setDetectedGate] = useState('');
+  const [userLocation, setUserLocation] = useState(null);
+
+  // Get user's current location once on mount
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  }, []);
 
   const { matchInfo, gates } = gameState?.venue || {
     matchInfo: { homeTeam: 'Loading', awayTeam: 'Loading', homeScore: 0, awayScore: 0, minute: 0 },
-    gates: {}
+    gates: {},
   };
+
   const alerts = gameState?.alerts || [];
+
   const gatesList = Object.entries(gates || {}).reduce((acc, [name, gate]) => {
     if (gate && typeof gate === 'object') {
       acc.push({ name, ...gate });
@@ -30,6 +50,7 @@ export default function Home() {
     return acc;
   }, []);
 
+  // Detect nearest gate from geolocation and save to user state
   useEffect(() => {
     if (userState?.gate || !navigator.geolocation || !gatesList.length) return;
 
@@ -54,28 +75,55 @@ export default function Home() {
         }
       },
       () => {
-        // ignore geolocation failures - keep current gate state
+        // ignore geolocation failures
       },
       { enableHighAccuracy: true, timeout: 15000 }
     );
   }, [gatesList.length, saveUser, userState?.gate]);
 
+  // ✅ FIX 2: gateLevels defined BEFORE crowdPercentage IIFE so it can reference it as fallback
   const gateLevels = gatesList.map((gate) => {
     if (gate?.crowdLevel === 'high') return 85;
     if (gate?.crowdLevel === 'medium') return 55;
     return 30;
   });
 
-  const crowdPercentage = gateLevels.length
-    ? Math.round(gateLevels.reduce((sum, value) => sum + value, 0) / gateLevels.length)
-    : 0;
+  // Crowd percentage — uses nearby gates if location available, else falls back to all gates
+  const crowdPercentage = (() => {
+    if (userLocation && gatesList.length) {
+      const nearbyGates = gatesList.filter((gate) => {
+        const coords = GATE_COORDS[gate.name];
+        if (!coords) return false;
+        const dx = (userLocation.lng - coords[0]) * 111320;
+        const dy = (userLocation.lat - coords[1]) * 111320;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance <= 200;
+      });
+
+      if (nearbyGates.length > 0) {
+        const nearbyLevels = nearbyGates.map((gate) => {
+          if (gate?.crowdLevel === 'high') return 85;
+          if (gate?.crowdLevel === 'medium') return 55;
+          return 30;
+        });
+        return Math.round(
+          nearbyLevels.reduce((sum, value) => sum + value, 0) / nearbyLevels.length
+        );
+      }
+    }
+
+    // Fallback: average of all gates
+    return gateLevels.length
+      ? Math.round(gateLevels.reduce((sum, value) => sum + value, 0) / gateLevels.length)
+      : 0;
+  })();
 
   const crowdLabel = crowdPercentage > 75 ? 'Busy' : crowdPercentage > 45 ? 'Moderate' : 'Light';
   const radius = 60;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (crowdPercentage / 100) * circumference;
 
-  // ✅ FIXED: properly closed reduce + ternary
+  // Best (lowest crowd) gate
   const lowCrowdGate = gatesList.length
     ? gatesList.reduce((best, gate) => {
         const score = { low: 3, medium: 2, high: 1 };
@@ -84,12 +132,15 @@ export default function Home() {
     : null;
 
   const smartSuggestionGate = userState?.gate || detectedGate || lowCrowdGate?.name || null;
-  const smartSuggestionData = smartSuggestionGate ? (gates?.[smartSuggestionGate] || { crowdLevel: 'low' }) : null;
-  const smartSuggestionText = smartSuggestionData?.crowdLevel === 'high'
-    ? 'This gate is currently busy, but still your best available route.'
-    : smartSuggestionData?.crowdLevel === 'medium'
-      ? 'This gate has moderate waiting, and it is still the fastest entry for your seat.'
-      : 'This gate has light flow and is the fastest entry for your seat.';
+  const smartSuggestionData = smartSuggestionGate
+    ? gates?.[smartSuggestionGate] || { crowdLevel: 'low' }
+    : null;
+  const smartSuggestionText =
+    smartSuggestionData?.crowdLevel === 'high'
+      ? 'This gate is currently busy, but still your best available route.'
+      : smartSuggestionData?.crowdLevel === 'medium'
+        ? 'This gate has moderate waiting, and it is still the fastest entry for your seat.'
+        : 'This gate has light flow and is the fastest entry for your seat.';
 
   const nearbyCrowdedGates = [...gatesList].sort((a, b) => {
     const score = { high: 3, medium: 2, low: 1 };
@@ -100,13 +151,13 @@ export default function Home() {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
+      transition: { staggerChildren: 0.1 },
+    },
   };
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } },
   };
 
   return (
@@ -115,7 +166,7 @@ export default function Home() {
       {/* Alerts Overlay */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
         <AnimatePresence>
-          {alerts.map(alert => (
+          {alerts.map((alert) => (
             <motion.div
               key={alert.id}
               initial={{ opacity: 0, x: 50, scale: 0.9 }}
@@ -148,15 +199,23 @@ export default function Home() {
       >
 
         {/* Welcome Card (Hero) */}
-        <motion.div variants={itemVariants} className="md:col-span-2 lg:col-span-2 row-span-2 glass-card rounded-[2rem] p-8 flex flex-col relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:bg-primary-500/20 transition-all duration-700"></div>
+        <motion.div
+          variants={itemVariants}
+          className="md:col-span-2 lg:col-span-2 row-span-2 glass-card rounded-[2rem] p-8 flex flex-col relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:bg-primary-500/20 transition-all duration-700" />
 
           <div className="flex-1">
             <p className="text-primary-300 font-semibold tracking-widest uppercase text-xs mb-2">Welcome Back</p>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-2">
-              Seat <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-sky-300">{userState?.seat || 'Guest'}</span>
+              Seat{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-sky-300">
+                {userState?.seat || 'Guest'}
+              </span>
             </h1>
-            <p className="text-slate-400 md:text-lg max-w-sm hidden md:block">Your personalized stadium experience is active. Enjoy the match.</p>
+            <p className="text-slate-400 md:text-lg max-w-sm hidden md:block">
+              Your personalized stadium experience is active. Enjoy the match.
+            </p>
           </div>
 
           <div className="mt-auto pt-8">
@@ -186,24 +245,32 @@ export default function Home() {
         </motion.div>
 
         {/* Nearby Crowded Places */}
-        <motion.div variants={itemVariants} className="glass-card rounded-[2rem] p-6 flex flex-col justify-between bg-slate-950/60 border border-white/10">
+        <motion.div
+          variants={itemVariants}
+          className="glass-card rounded-[2rem] p-6 flex flex-col justify-between bg-slate-950/60 border border-white/10"
+        >
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-slate-400 mb-4">Nearby Crowded Places</p>
             {nearbyCrowdedGates.length ? (
               <div className="space-y-3">
                 {nearbyCrowdedGates.slice(0, 3).map((gate) => (
-                  <div key={gate.name} className="rounded-3xl p-4 bg-white/5 border border-white/10 flex items-center justify-between gap-4">
+                  <div
+                    key={gate.name}
+                    className="rounded-3xl p-4 bg-white/5 border border-white/10 flex items-center justify-between gap-4"
+                  >
                     <div>
                       <p className="text-sm font-bold text-white">{gate.name}</p>
                       <p className="text-xs text-slate-400">Current flow: {gate.crowdLevel}</p>
                     </div>
-                    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
-                      gate.crowdLevel === 'high'
-                        ? 'bg-rose-500/20 text-rose-300'
-                        : gate.crowdLevel === 'medium'
-                          ? 'bg-amber-500/20 text-amber-300'
-                          : 'bg-emerald-500/20 text-emerald-300'
-                    }`}>
+                    <span
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
+                        gate.crowdLevel === 'high'
+                          ? 'bg-rose-500/20 text-rose-300'
+                          : gate.crowdLevel === 'medium'
+                            ? 'bg-amber-500/20 text-amber-300'
+                            : 'bg-emerald-500/20 text-emerald-300'
+                      }`}
+                    >
                       {gate.crowdLevel.toUpperCase()}
                     </span>
                   </div>
@@ -223,16 +290,18 @@ export default function Home() {
         </motion.div>
 
         {/* Live Score Bento */}
-        <motion.div variants={itemVariants} className="md:col-span-2 lg:col-span-2 glass-card rounded-[2rem] p-6 lg:p-8 flex flex-col justify-between relative overflow-hidden bento-hover cursor-pointer group">
-          <div className="absolute -inset-0.5 bg-gradient-to-br from-white/10 to-transparent rounded-[2rem] opacity-0 group-hover:opacity-100 transition duration-500 z-0"></div>
+        <motion.div
+          variants={itemVariants}
+          className="md:col-span-2 lg:col-span-2 glass-card rounded-[2rem] p-6 lg:p-8 flex flex-col justify-between relative overflow-hidden bento-hover cursor-pointer group"
+        >
+          <div className="absolute -inset-0.5 bg-gradient-to-br from-white/10 to-transparent rounded-[2rem] opacity-0 group-hover:opacity-100 transition duration-500 z-0" />
           <div className="relative z-10 flex justify-between items-center w-full">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Live Match</p>
             <div className="flex items-center gap-2 bg-rose-500/20 text-rose-400 px-3 py-1 rounded-full text-xs font-bold">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
               {matchInfo.minute}' MIN
             </div>
           </div>
-
           <div className="relative z-10 flex items-center justify-between mt-6">
             <div className="flex flex-col items-center">
               <span className="text-5xl md:text-6xl lg:text-7xl font-black text-white">{matchInfo.homeScore}</span>
@@ -247,43 +316,47 @@ export default function Home() {
         </motion.div>
 
         {/* Crowd Density Bento */}
-        <motion.div variants={itemVariants} className="md:col-span-1 lg:col-span-1 h-full glass-card rounded-[2rem] p-6 flex flex-col items-center justify-center bento-hover">
-          <h3 className="text-sm font-bold text-slate-400 tracking-widest uppercase mb-6 w-full text-center">Crowd Index</h3>
-
-          {crowdPercentage !== null ? (
-            <>
-              <div className="relative w-32 h-32 md:w-40 md:h-40 flex-shrink-0">
-                <svg className="w-full h-full transform -rotate-90">
-                  <circle
-                    cx="50%" cy="50%" r={radius}
-                    stroke="currentColor" strokeWidth="12" fill="transparent"
-                    className="text-white/5"
-                  />
-                  <circle
-                    cx="50%" cy="50%" r={radius}
-                    stroke="currentColor" strokeWidth="12" fill="transparent"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    className="text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)] transition-all duration-1000 ease-out"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center flex-col">
-                  <span className="text-3xl md:text-4xl font-black text-white">{crowdPercentage}<span className="text-xl">%</span></span>
-                </div>
-              </div>
-              <div className="mt-4 flex items-center gap-2 text-yellow-400 bg-yellow-400/10 px-4 py-2 rounded-full">
-                <span className="text-sm font-bold">{crowdLabel}</span>
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-slate-400 text-center">Waiting for live stadium crowd data from the venue sensors.</p>
-          )}
+        <motion.div
+          variants={itemVariants}
+          className="md:col-span-1 lg:col-span-1 h-full glass-card rounded-[2rem] p-6 flex flex-col items-center justify-center bento-hover"
+        >
+          <h3 className="text-sm font-bold text-slate-400 tracking-widest uppercase mb-6 w-full text-center">
+            Crowd Index
+          </h3>
+          <div className="relative w-32 h-32 md:w-40 md:h-40 flex-shrink-0">
+            <svg className="w-full h-full transform -rotate-90">
+              <circle
+                cx="50%" cy="50%" r={radius}
+                stroke="currentColor" strokeWidth="12" fill="transparent"
+                className="text-white/5"
+              />
+              <circle
+                cx="50%" cy="50%" r={radius}
+                stroke="currentColor" strokeWidth="12" fill="transparent"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                className="text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)] transition-all duration-1000 ease-out"
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center flex-col">
+              <span className="text-3xl md:text-4xl font-black text-white">
+                {crowdPercentage}<span className="text-xl">%</span>
+              </span>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-2 text-yellow-400 bg-yellow-400/10 px-4 py-2 rounded-full">
+            <span className="text-sm font-bold">{crowdLabel}</span>
+          </div>
         </motion.div>
 
         {/* Quick Action: Order */}
-        <motion.div variants={itemVariants} onClick={() => navigate('/orders')} className="md:col-span-1 lg:col-span-1 h-full bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-6 flex flex-col relative overflow-hidden bento-hover cursor-pointer group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-700"></div>
+        <motion.div
+          variants={itemVariants}
+          onClick={() => navigate('/orders')}
+          className="md:col-span-1 lg:col-span-1 h-full bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-6 flex flex-col relative overflow-hidden bento-hover cursor-pointer group"
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-700" />
           <div className="w-14 h-14 rounded-2xl bg-orange-500/20 flex items-center justify-center text-orange-400 mb-auto relative z-10">
             <Coffee size={28} />
           </div>
@@ -294,8 +367,12 @@ export default function Home() {
         </motion.div>
 
         {/* Quick Action: Exit */}
-        <motion.div variants={itemVariants} onClick={() => navigate('/exit')} className="md:col-span-2 lg:col-span-2 glass-card rounded-[2rem] p-6 lg:p-8 flex items-center justify-between bento-hover cursor-pointer relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/5 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        <motion.div
+          variants={itemVariants}
+          onClick={() => navigate('/exit')}
+          className="md:col-span-2 lg:col-span-2 glass-card rounded-[2rem] p-6 lg:p-8 flex items-center justify-between bento-hover cursor-pointer relative overflow-hidden group"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/5 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <div className="flex items-center gap-6 relative z-10">
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.3)] group-hover:scale-110 transition-transform duration-500">
               <DoorOpen size={30} />
