@@ -9,89 +9,134 @@ import "@maptiler/sdk/dist/maptiler-sdk.css";
 const MAPTILER_KEY = "7FIIPceVDt9GG4LY3oxW";
 maptilersdk.config.apiKey = MAPTILER_KEY;
 
+const GATE_COORDS = {
+  'Gate 1': [-0.2760, 51.5568],
+  'Gate 2': [-0.2812, 51.5568],
+  'Gate 3': [-0.2812, 51.5552],
+  'Gate 4': [-0.2760, 51.5552],
+};
+
+const EXIT_COORD = [-0.2700, 51.5520];
+
 export default function MapScreen() {
   const { userState } = useUser();
   const { gameState } = useSimulation();
   const currentGate = userState?.gate || "Gate 4";
   const [viewMode, setViewMode] = useState('arrival'); // arrival, heatmap
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationError, setLocationError] = useState('');
 
   const mapContainer = useRef(null);
   const map = useRef(null);
 
   useEffect(() => {
-    if (map.current) return; // initialize map only once
-    
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by this browser.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+      },
+      (error) => {
+        setLocationError(error.message || 'Unable to access location.');
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  }, []);
+
+  useEffect(() => {
+    if (map.current) return;
+    if (!userLocation && !locationError) return;
+
+    const gateCoords = GATE_COORDS[currentGate] || [-0.2795, 51.5560];
+    const center = userLocation ? [userLocation.lng, userLocation.lat] : gateCoords;
+    const routeSource = userLocation
+      ? [center, gateCoords]
+      : [gateCoords, EXIT_COORD];
+
     map.current = new maptilersdk.Map({
       container: mapContainer.current,
       style: maptilersdk.MapStyle.STREETS,
-      center: [-0.2795, 51.5560], // Longitude, Latitude
+      center,
       zoom: 16.5,
-      pitch: 45, // Add a premium 3D tilt
+      pitch: 45,
     });
 
     map.current.on('style.load', () => {
-      // Setup Arrival Route Path (Mocked coordinates near Stadium)
       map.current.addSource('route', {
-        'type': 'geojson',
-        'data': {
-          'type': 'Feature',
-          'properties': {},
-          'geometry': {
-            'type': 'LineString',
-            'coordinates': [
-              [-0.2780, 51.5540], // Gate origin
-              [-0.2795, 51.5560]  // Seat destination
-            ]
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: routeSource
           }
         }
       });
 
       map.current.addLayer({
-        'id': 'route-layer',
-        'type': 'line',
-        'source': 'route',
-        'layout': {
+        id: 'route-layer',
+        type: 'line',
+        source: 'route',
+        layout: {
           'line-join': 'round',
           'line-cap': 'round'
         },
-        'paint': {
+        paint: {
           'line-color': userState?.accessibility ? '#3b82f6' : '#0ea5e9',
           'line-width': 8,
           'line-opacity': 0.8
         }
       });
-      
-      // Setup Heatmap Source (Mock clustering)
+
       map.current.addSource('heatmap-points', {
-          'type': 'geojson',
-          'data': {
-              'type': 'FeatureCollection',
-              'features': []
-          }
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: []
+        }
       });
-      
+
       map.current.addLayer({
-          'id': 'crowd-heatmap',
-          'type': 'heatmap',
-          'source': 'heatmap-points',
-          'paint': {
-              'heatmap-weight': 1,
-              'heatmap-intensity': 1,
-              'heatmap-color': [
-                  'interpolate', ['linear'], ['heatmap-density'],
-                  0, 'rgba(33,102,172,0)',
-                  0.2, 'rgb(103,169,207)',
-                  0.4, 'rgb(209,229,240)',
-                  0.6, 'rgb(253,219,199)',
-                  0.8, 'rgb(239,138,98)',
-                  1, 'rgb(178,24,43)'
-              ],
-              'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 9, 20, 16, 80],
-              'heatmap-opacity': 0.8
-          }
+        id: 'crowd-heatmap',
+        type: 'heatmap',
+        source: 'heatmap-points',
+        paint: {
+          'heatmap-weight': 1,
+          'heatmap-intensity': 1,
+          'heatmap-color': [
+            'interpolate', ['linear'], ['heatmap-density'],
+            0, 'rgba(33,102,172,0)',
+            0.2, 'rgb(103,169,207)',
+            0.4, 'rgb(209,229,240)',
+            0.6, 'rgb(253,219,199)',
+            0.8, 'rgb(239,138,98)',
+            1, 'rgb(178,24,43)'
+          ],
+          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 9, 20, 16, 80],
+          'heatmap-opacity': 0.8
+        }
       });
+
+      if (userLocation) {
+        new maptilersdk.Marker({ color: '#38bdf8' })
+          .setLngLat(center)
+          .setPopup(new maptilersdk.Popup({ offset: 25 }).setText('Your current location'))
+          .addTo(map.current);
+      }
+
+      new maptilersdk.Marker({ color: '#f97316' })
+        .setLngLat(gateCoords)
+        .setPopup(new maptilersdk.Popup({ offset: 25 }).setText(`${currentGate} entry`))
+        .addTo(map.current);
     });
-  }, [userState?.accessibility]);
+  }, [userLocation, locationError, currentGate, userState?.accessibility]);
 
   // Handle live toggle switches for layers
   useEffect(() => {
@@ -104,18 +149,24 @@ export default function MapScreen() {
         map.current.setLayoutProperty('route-layer', 'visibility', 'none');
         map.current.setLayoutProperty('crowd-heatmap', 'visibility', 'visible');
         
-        // Dynamically update heatmap data from context
-        const features = [];
-        Object.values(gameState.venue.gates).forEach((gate) => {
-            if (gate.crowdLevel === 'high') {
-                for(let i=0; i<30; i++) {
-                    features.push({
-                        type: 'Feature',
-                        geometry: { type: 'Point', coordinates: [ -0.2780 + (Math.random()*0.002), 51.5540 + (Math.random()*0.002) ]}
-                    });
-                }
+        const features = Object.entries(gameState.venue.gates).flatMap(([gateName, gate]) => {
+          const gateCoords = GATE_COORDS[gateName] || [-0.2795, 51.5560];
+          const count = gate.crowdLevel === 'high' ? 20 : gate.crowdLevel === 'medium' ? 12 : 6;
+          return Array.from({ length: count }, (_, index) => ({
+            type: 'Feature',
+            properties: {
+              density: gate.crowdLevel === 'high' ? 1 : gate.crowdLevel === 'medium' ? 0.6 : 0.25
+            },
+            geometry: {
+              type: 'Point',
+              coordinates: [
+                gateCoords[0] + ((index % 3) - 1) * 0.00005,
+                gateCoords[1] + (Math.floor(index / 3) - 1) * 0.00005
+              ]
             }
+          }));
         });
+
         map.current.getSource('heatmap-points').setData({ type: 'FeatureCollection', features });
      }
   }, [viewMode, gameState.venue.gates]);
@@ -171,6 +222,11 @@ export default function MapScreen() {
                      {userState?.accessibility && <span className="bg-blue-500 text-white text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded">ADA Active</span>}
                   </div>
                   <p className="text-slate-400 text-sm mt-1">{currentGate} • Dynamic Route Active</p>
+                  <p className="text-slate-400 text-xs mt-1 uppercase tracking-[0.2em]">
+                    {userLocation
+                      ? `Live coordinates: ${userLocation.lat.toFixed(5)}, ${userLocation.lng.toFixed(5)}`
+                      : locationError || 'Requesting real device location...'}
+                  </p>
                 </div>
               </div>
               <div className="hidden sm:block text-right border-l border-white/10 pl-6">

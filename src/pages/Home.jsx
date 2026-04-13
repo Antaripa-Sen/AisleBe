@@ -10,10 +10,19 @@ export default function Home() {
   const { gameState, dismissAlert } = useSimulation();
   const navigate = useNavigate();
 
-  const { matchInfo } = gameState.venue;
+  const { matchInfo, gates } = gameState.venue;
 
-  // Render Ring Chart
-  const crowdPercentage = 42; 
+  const gateLevels = Object.values(gates || {}).map((gate) => {
+    if (gate.crowdLevel === 'high') return 85;
+    if (gate.crowdLevel === 'medium') return 55;
+    return 30;
+  });
+
+  const crowdPercentage = gateLevels.length
+    ? Math.round(gateLevels.reduce((sum, value) => sum + value, 0) / gateLevels.length)
+    : 42;
+
+  const crowdLabel = crowdPercentage > 75 ? 'Busy' : crowdPercentage > 45 ? 'Moderate' : 'Light';
   const radius = 60;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (crowdPercentage / 100) * circumference;
@@ -145,7 +154,7 @@ export default function Home() {
               </div>
             </div>
             <div className="mt-4 flex items-center gap-2 text-yellow-400 bg-yellow-400/10 px-4 py-2 rounded-full">
-              <span className="text-sm font-bold">Moderate</span>
+              <span className="text-sm font-bold">{crowdLabel}</span>
             </div>
         </motion.div>
 

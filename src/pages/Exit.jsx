@@ -15,6 +15,8 @@ export default function Exit() {
   
   const currentGate = userState?.gate || "Gate 4";
   const crowdLevel = gameState.venue.gates[currentGate]?.crowdLevel || 'high';
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationError, setLocationError] = useState('');
 
   const [selectedPlan, setSelectedPlan] = useState(0);
   const mapContainer = useRef(null);
@@ -26,38 +28,92 @@ export default function Exit() {
      { id: 2, title: "Optimal Clearance", wait: "15 mins", eta: "6 mins", crowd: "low", carEta: "2 mins", routeColor: '#10b981' }
   ];
 
-  // Initialize and handle MapTiler logic
-  useEffect(() => {
-     if (map.current) return;
-     
-     map.current = new maptilersdk.Map({
-        container: mapContainer.current,
-        style: maptilersdk.MapStyle.STREETS,
-        center: [-0.2795, 51.5560], // Stadium core
-        zoom: 15.5,
-        interactive: false // Static preview mode
-     });
+  const GATE_COORDS = {
+    'Gate 1': [-0.2760, 51.5568],
+    'Gate 2': [-0.2812, 51.5568],
+    'Gate 3': [-0.2812, 51.5552],
+    'Gate 4': [-0.2760, 51.5552],
+  };
 
-     map.current.on('style.load', () => {
-         map.current.addSource('escape-route', {
-            'type': 'geojson',
-            'data': {
-               'type': 'Feature',
-               'geometry': {
-                  'type': 'LineString',
-                  'coordinates': [[-0.2795, 51.5560], [-0.2700, 51.5520]]
-               }
-            }
-         });
-         map.current.addLayer({
-            'id': 'escape-layer',
-            'type': 'line',
-            'source': 'escape-route',
-            'layout': { 'line-join': 'round', 'line-cap': 'round' },
-            'paint': { 'line-color': plans[0].routeColor, 'line-width': 8, 'line-opacity': 0.8 }
-         });
-     });
+  const EXIT_COORD = [-0.2700, 51.5520];
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation unsupported.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+      },
+      (error) => setLocationError(error.message || 'Unable to access location.'),
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
   }, []);
+
+  useEffect(() => {
+     const gateCoords = GATE_COORDS[currentGate] || [-0.2795, 51.5560];
+     const origin = userLocation ? [userLocation.lng, userLocation.lat] : gateCoords;
+
+     if (!map.current) {
+       map.current = new maptilersdk.Map({
+          container: mapContainer.current,
+          style: maptilersdk.MapStyle.STREETS,
+          center: origin,
+          zoom: 15.5,
+          interactive: true
+       });
+
+       map.current.on('style.load', () => {
+           map.current.addSource('escape-route', {
+              'type': 'geojson',
+              'data': {
+                 'type': 'Feature',
+                 'geometry': {
+                    'type': 'LineString',
+                    'coordinates': [origin, EXIT_COORD]
+                 }
+              }
+           });
+           map.current.addLayer({
+              'id': 'escape-layer',
+              'type': 'line',
+              'source': 'escape-route',
+              'layout': { 'line-join': 'round', 'line-cap': 'round' },
+              'paint': { 'line-color': plans[0].routeColor, 'line-width': 8, 'line-opacity': 0.8 }
+           });
+
+           if (userLocation) {
+             new maptilersdk.Marker({ color: '#38bdf8' })
+               .setLngLat(origin)
+               .setPopup(new maptilersdk.Popup({ offset: 25 }).setText('Your current location'))
+               .addTo(map.current);
+           }
+
+           new maptilersdk.Marker({ color: '#f97316' })
+             .setLngLat(gateCoords)
+             .setPopup(new maptilersdk.Popup({ offset: 25 }).setText(`${currentGate} entry`))
+             .addTo(map.current);
+
+           new maptilersdk.Marker({ color: '#22c55e' })
+             .setLngLat(EXIT_COORD)
+             .setPopup(new maptilersdk.Popup({ offset: 25 }).setText('Recommended exit'))
+             .addTo(map.current);
+       });
+     } else if (userLocation && map.current.getSource('escape-route')) {
+       map.current.getSource('escape-route').setData({
+         type: 'Feature',
+         geometry: {
+           type: 'LineString',
+           coordinates: [origin, EXIT_COORD]
+         }
+       });
+     }
+  }, [currentGate, userLocation]);
 
   // Update line color based on selected plan
   useEffect(() => {
