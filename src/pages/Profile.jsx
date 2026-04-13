@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { useSimulation } from '../context/SimulationContext';
-import { User, Mail, MapPin, Ticket, Star, Settings, LogOut, Edit } from 'lucide-react';
+import { User, Mail, MapPin, Ticket, Star, Settings, LogOut, Edit, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Profile() {
-  const { userState, logout, saveUser } = useUser();
+  const navigate = useNavigate();
+  const { userState, logout, deleteAccount, saveUser } = useUser();
   const { gameState } = useSimulation();
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
@@ -21,6 +23,24 @@ export default function Profile() {
   const handleSave = () => {
     saveUser(editData);
     setIsEditing(false);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm('Delete your account permanently? This cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      await deleteAccount(userState?.email);
+      navigate('/login');
+    } catch (error) {
+      console.error(error);
+      window.alert(error.message || 'Unable to delete account.');
+    }
   };
 
   return (
@@ -43,7 +63,7 @@ export default function Profile() {
                 <p className="text-slate-400 mt-1">AisleBe Member</p>
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-col sm:flex-row">
               <button 
                 onClick={() => setIsEditing(!isEditing)}
                 className="px-4 py-2 bg-white/10 text-white rounded-xl font-bold hover:bg-white/20 flex items-center gap-2"
@@ -52,7 +72,7 @@ export default function Profile() {
                 {isEditing ? 'Cancel' : 'Edit'}
               </button>
               <button 
-                onClick={logout}
+                onClick={handleLogout}
                 className="px-4 py-2 bg-red-500/20 text-red-400 rounded-xl font-bold hover:bg-red-500/30 flex items-center gap-2"
               >
                 <LogOut size={16} />
@@ -200,6 +220,37 @@ export default function Profile() {
               <p className="text-3xl font-black text-white">{userState?.ridesBooked ?? 0}</p>
               <p className="text-slate-400 text-sm">Rides Booked</p>
             </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+          className="glass-card p-6 md:p-8 rounded-[2rem] border border-red-500/10 bg-red-500/5"
+        >
+          <div className="flex flex-col gap-4">
+            <div>
+              <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-3">
+                <Trash2 size={24} className="text-red-400" />
+                Account Security
+              </h3>
+              <p className="text-slate-400 text-sm">Permanently delete your account and remove all saved user data from this device.</p>
+            </div>
+
+            {userState?.isGuest ? (
+              <div className="rounded-3xl bg-white/5 p-4 text-sm text-slate-300">
+                Guest sessions cannot be deleted. Use logout to end this session.
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                className="w-full rounded-2xl bg-red-500 text-white py-4 font-bold hover:bg-red-600 transition-all"
+              >
+                Delete Account
+              </button>
+            )}
           </div>
         </motion.div>
       </div>

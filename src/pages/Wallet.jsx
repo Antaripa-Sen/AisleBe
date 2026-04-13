@@ -17,25 +17,31 @@ const RECENT_EVENTS = [
 ];
 
 export default function Wallet() {
-  const { userState } = useUser();
+  const { userState, saveUser, theme, toggleTheme } = useUser();
   const { gameState } = useSimulation();
 
   const [showRedeemModal, setShowRedeemModal] = useState(false);
   const [redeemedItems, setRedeemedItems] = useState([]);
-  const [isDark, setIsDark] = useState(true);
+
+  const availablePoints = userState?.loyaltyPoints ?? 0;
 
   const nextMatchName = gameState?.venue?.matchInfo?.homeTeam && gameState?.venue?.matchInfo?.awayTeam
     ? `${gameState.venue.matchInfo.homeTeam} vs ${gameState.venue.matchInfo.awayTeam}`
     : 'Upcoming stadium event';
   const nextMatchTime = gameState?.venue?.matchInfo?.minute ? `Live — ${gameState.venue.matchInfo.minute} min` : 'Live status unavailable';
 
-  const ticketData = `Ticket: ${nextMatchName} | Gate: ${userState?.gate || 'Gate 4'} | Seat: ${userState?.seat || 'A1'} | User: ${userState?.seat || 'GUEST'}`;
+  const ticketData = `Ticket: ${nextMatchName} | Gate: ${userState?.gate || 'Unknown'} | Seat: ${userState?.seat || 'A1'} | User: ${userState?.name || 'Guest'}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(ticketData)}`;
 
   const handleRedeem = (item) => {
-    setRedeemedItems([...redeemedItems, item]);
+    if (availablePoints < item.points) {
+      window.alert('You do not have enough loyalty points to redeem this reward.');
+      return;
+    }
+
+    saveUser({ loyaltyPoints: availablePoints - item.points });
+    setRedeemedItems((current) => [...current, item]);
     setShowRedeemModal(false);
-    // Optionally update userState or save to Firebase
   };
 
   return (
@@ -46,10 +52,10 @@ export default function Wallet() {
            <p className="text-slate-400 mt-2 text-sm md:text-base">Live tickets, loyalty rewards, and ride bookings.</p>
          </div>
          <button 
-           onClick={() => setIsDark(!isDark)}
+           onClick={toggleTheme}
            className="p-3 bg-white/10 rounded-xl hover:bg-white/20 transition-colors"
          >
-           {isDark ? <Sun className="text-yellow-400" size={24} /> : <Moon className="text-slate-400" size={24} />}
+           {theme === 'light' ? <Moon className="text-slate-900" size={24} /> : <Sun className="text-yellow-400" size={24} />}
          </button>
       </div>
 
@@ -75,7 +81,7 @@ export default function Wallet() {
              <div className="mt-12 grid grid-cols-2 gap-6 border-t border-dashed border-white/30 pt-6">
                 <div>
                    <p className="text-primary-200 text-xs font-semibold uppercase tracking-wider">Gate</p>
-                   <p className="text-2xl font-bold text-white">{userState?.gate || 'Gate 4'}</p>
+                   <p className="text-2xl font-bold text-white">{userState?.gate || 'Awaiting gate assignment'}</p>
                 </div>
                 <div>
                    <p className="text-primary-200 text-xs font-semibold uppercase tracking-wider">Seat</p>

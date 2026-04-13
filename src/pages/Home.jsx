@@ -1,18 +1,57 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, Coffee, DoorOpen, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { useSimulation } from '../context/SimulationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const GATE_COORDS = {
+  'Gate 1': [-0.2760, 51.5568],
+  'Gate 2': [-0.2812, 51.5568],
+  'Gate 3': [-0.2812, 51.5552],
+  'Gate 4': [-0.2760, 51.5552],
+};
+
 export default function Home() {
-  const { userState } = useUser();
+  const { userState, saveUser } = useUser();
   const { gameState, dismissAlert } = useSimulation();
   const navigate = useNavigate();
+  const [detectedGate, setDetectedGate] = useState(userState?.gate || '');
 
   const { matchInfo, gates } = gameState.venue;
+  const gatesList = Object.entries(gates || {}).map(([name, gate]) => ({ name, ...gate }));
 
-  const gateLevels = Object.values(gates || {}).map((gate) => {
+  useEffect(() => {
+    if (userState?.gate || !navigator.geolocation || !gatesList.length) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const nearestGate = gatesList.reduce((closest, gate) => {
+          const coords = GATE_COORDS[gate.name];
+          if (!coords) return closest;
+          const dx = longitude - coords[0];
+          const dy = latitude - coords[1];
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (!closest || distance < closest.distance) {
+            return { name: gate.name, distance };
+          }
+          return closest;
+        }, null);
+
+        if (nearestGate?.name) {
+          saveUser({ gate: nearestGate.name });
+          setDetectedGate(nearestGate.name);
+        }
+      },
+      () => {
+        // ignore geolocation failures - keep current gate state
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  }, [gatesList.length, saveUser, userState?.gate]);
+
+  const gateLevels = gatesList.map((gate) => {
     if (gate.crowdLevel === 'high') return 85;
     if (gate.crowdLevel === 'medium') return 55;
     return 30;
@@ -20,12 +59,32 @@ export default function Home() {
 
   const crowdPercentage = gateLevels.length
     ? Math.round(gateLevels.reduce((sum, value) => sum + value, 0) / gateLevels.length)
-    : 42;
+    : null;
 
-  const crowdLabel = crowdPercentage > 75 ? 'Busy' : crowdPercentage > 45 ? 'Moderate' : 'Light';
+  const crowdLabel = crowdPercentage === null ? 'Loading' : crowdPercentage > 75 ? 'Busy' : crowdPercentage > 45 ? 'Moderate' : 'Light';
   const radius = 60;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (crowdPercentage / 100) * circumference;
+
+  const lowCrowdGate = gatesList.length
+    ? gatesList.reduce((best, gate) => {
+        const score = { low: 3, medium: 2, high: 1 };
+        return score[gate.crowdLevel] > score[best.crowdLevel] ? gate : best;
+      }, gatesList[0])
+    : null;
+
+  const smartSuggestionGate = userState?.gate || detectedGate || lowCrowdGate?.name || null;
+  const smartSuggestionData = smartSuggestionGate ? (gates?.[smartSuggestionGate] || { crowdLevel: 'low' }) : null;
+  const smartSuggestionText = smartSuggestionData?.crowdLevel === 'high'
+    ? 'This gate is currently busy, but still your best available route.'
+    : smartSuggestionData.crowdLevel === 'medium'
+      ? 'This gate has moderate waiting, and it is still the fastest entry for your seat.'
+      : 'This gate has light flow and is the fastest entry for your seat.';
+
+  const nearbyCrowdedGates = gatesList.sort((a, b) => {
+    const score = { high: 3, medium: 2, low: 1 };
+    return score[b.crowdLevel] - score[a.crowdLevel];
+  });
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -97,12 +156,54 @@ export default function Home() {
               </div>
               <div>
                 <h3 className="text-sm md:text-base font-bold text-white">Smart Suggestion Active</h3>
-                <p className="text-xs md:text-sm text-slate-300 mt-1 leading-relaxed">
-                   Enter via <strong>{userState?.gate}</strong> for the fastest route to your seat right now.
-                </p>
+                {smartSuggestionGate ? (
+                  <>
+                    <p className="text-xs md:text-sm text-slate-300 mt-1 leading-relaxed">
+                      Enter via <strong>{smartSuggestionGate}</strong> for the fastest route to your seat right now.
+                    </p>
+                    <p className="text-xs md:text-sm text-slate-300 mt-2 leading-relaxed">
+                      {smartSuggestionText}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs md:text-sm text-slate-300 mt-1 leading-relaxed">
+                    Waiting for live gate data to suggest the best entry point.
+                  </p>
+                )}
               </div>
             </div>
           </div>
+        </motion.div>
+
+        {/* Nearby Crowded Places */}
+        <motion.div variants={itemVariants} className="glass-card rounded-[2rem] p-6 flex flex-col justify-between bg-slate-950/60 border border-white/10">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-slate-400 mb-4">Nearby Crowded Places</p>
+            {nearbyCrowdedGates.length ? (
+              <div className="space-y-3">
+                {nearbyCrowdedGates.slice(0, 3).map((gate) => (
+                  <div key={gate.name} className="rounded-3xl p-4 bg-white/5 border border-white/10 flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-bold text-white">{gate.name}</p>
+                      <p className="text-xs text-slate-400">Current flow: {gate.crowdLevel}</p>
+                    </div>
+                    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${gate.crowdLevel === 'high' ? 'bg-rose-500/20 text-rose-300' : gate.crowdLevel === 'medium' ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                      {gate.crowdLevel.toUpperCase()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400">Crowd data is loading from the stadium sensors.</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/map')}
+            className="mt-6 w-full rounded-2xl bg-gradient-to-r from-primary-500 to-sky-500 px-5 py-4 text-sm font-bold text-white hover:from-primary-600 hover:to-sky-600 transition-all"
+          >
+            View live crowd map
+          </button>
         </motion.div>
 
         {/* Live Score Bento */}
@@ -133,29 +234,35 @@ export default function Home() {
         <motion.div variants={itemVariants} className="md:col-span-1 lg:col-span-1 h-full glass-card rounded-[2rem] p-6 flex flex-col items-center justify-center bento-hover">
            <h3 className="text-sm font-bold text-slate-400 tracking-widest uppercase mb-6 w-full text-center">Crowd Index</h3>
            
-           <div className="relative w-32 h-32 md:w-40 md:h-40 flex-shrink-0">
-              <svg className="w-full h-full transform -rotate-90">
-                <circle
-                  cx="50%" cy="50%" r={radius}
-                  stroke="currentColor" strokeWidth="12" fill="transparent"
-                  className="text-white/5"
-                />
-                <circle
-                  cx="50%" cy="50%" r={radius}
-                  stroke="currentColor" strokeWidth="12" fill="transparent"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={strokeDashoffset}
-                  className="text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)] transition-all duration-1000 ease-out"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center flex-col">
-                <span className="text-3xl md:text-4xl font-black text-white">{crowdPercentage}<span className="text-xl">%</span></span>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center gap-2 text-yellow-400 bg-yellow-400/10 px-4 py-2 rounded-full">
-              <span className="text-sm font-bold">{crowdLabel}</span>
-            </div>
+           {crowdPercentage !== null ? (
+             <>
+               <div className="relative w-32 h-32 md:w-40 md:h-40 flex-shrink-0">
+                 <svg className="w-full h-full transform -rotate-90">
+                   <circle
+                     cx="50%" cy="50%" r={radius}
+                     stroke="currentColor" strokeWidth="12" fill="transparent"
+                     className="text-white/5"
+                   />
+                   <circle
+                     cx="50%" cy="50%" r={radius}
+                     stroke="currentColor" strokeWidth="12" fill="transparent"
+                     strokeDasharray={circumference}
+                     strokeDashoffset={strokeDashoffset}
+                     className="text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)] transition-all duration-1000 ease-out"
+                     strokeLinecap="round"
+                   />
+                 </svg>
+                 <div className="absolute inset-0 flex items-center justify-center flex-col">
+                   <span className="text-3xl md:text-4xl font-black text-white">{crowdPercentage}<span className="text-xl">%</span></span>
+                 </div>
+               </div>
+               <div className="mt-4 flex items-center gap-2 text-yellow-400 bg-yellow-400/10 px-4 py-2 rounded-full">
+                 <span className="text-sm font-bold">{crowdLabel}</span>
+               </div>
+             </>
+           ) : (
+             <p className="text-sm text-slate-400 text-center">Waiting for live stadium crowd data from the venue sensors.</p>
+           )}
         </motion.div>
 
         {/* Quick Action: Order */}

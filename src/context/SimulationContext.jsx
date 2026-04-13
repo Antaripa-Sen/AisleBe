@@ -8,9 +8,9 @@ export function SimulationProvider({ children }) {
   const [gameState, setGameState] = useState({
     venue: {
       matchInfo: { homeTeam: "Loading", awayTeam: "Loading", homeScore: 0, awayScore: 0, minute: 0 },
-      gates: { "Gate 4": { crowdLevel: "low" } },
-      concessions: { north_stand: { waitMins: 0, crowdLevel: "low", name: "North Stand Bites" } },
-      restrooms: { r1: { waitMins: 0, crowdLevel: "low" } }
+      gates: {},
+      concessions: {},
+      restrooms: {}
     },
     alerts: []
   });

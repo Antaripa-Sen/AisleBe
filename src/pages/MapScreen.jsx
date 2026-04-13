@@ -171,6 +171,13 @@ export default function MapScreen() {
      }
   }, [viewMode, gameState.venue.gates]);
 
+  const nearbyCrowdedGates = Object.entries(gameState.venue.gates || {})
+    .map(([name, gate]) => ({ name, ...gate }))
+    .sort((a, b) => {
+      const score = { high: 3, medium: 2, low: 1 };
+      return score[b.crowdLevel] - score[a.crowdLevel];
+    });
+
   return (
     <div className="h-full w-full flex flex-col relative bg-dark-900 overflow-hidden">
       
@@ -233,6 +240,40 @@ export default function MapScreen() {
                  <div className="text-2xl font-black text-white">Live</div>
                  <p className="text-[10px] font-bold tracking-widest text-emerald-400 uppercase mt-1">MapTiler</p>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {viewMode === 'heatmap' && (
+          <motion.div 
+            initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}
+            className="absolute bottom-24 lg:bottom-12 inset-x-4 max-w-xl mx-auto z-30 pointer-events-auto"
+          >
+            <div className="bg-dark-800/95 backdrop-blur-2xl p-6 rounded-[2rem] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.6)] space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Nearby crowded zones</p>
+                  <h3 className="text-xl lg:text-2xl font-black text-white">Live crowd heatmap</h3>
+                </div>
+                <span className="inline-flex items-center rounded-full bg-rose-500/10 text-rose-300 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em]">Updated in real time</span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {nearbyCrowdedGates.slice(0, 2).map((gate) => (
+                  <div key={gate.name} className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-sm text-slate-400 uppercase tracking-[0.2em] mb-2">{gate.name}</p>
+                    <div className="flex items-center justify-between gap-4">
+                      <p className="text-lg font-bold text-white">{gate.crowdLevel}</p>
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${gate.crowdLevel === 'high' ? 'bg-rose-500/20 text-rose-200' : gate.crowdLevel === 'medium' ? 'bg-amber-500/20 text-amber-200' : 'bg-emerald-500/20 text-emerald-200'}`}>
+                        {gate.crowdLevel.toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2">Realtime crowd reading from stadium sensors.</p>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs text-slate-400">Tap the route toggle to compare your arrival route with the heatmap of busy gates. This reflects the current venue crowd state.</p>
             </div>
           </motion.div>
         )}

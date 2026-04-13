@@ -105,6 +105,10 @@ export default function Orders() {
   const { userState } = useUser();
   const [activeTab, setActiveTab] = useState('food');
 
+  const queueTime = gameState?.venue?.concessions?.north_stand?.waitMins ?? 0;
+  const currentGate = userState?.gate || 'Gate 4';
+  const foodPref = userState?.foodPref ? userState.foodPref.toUpperCase() : 'GENERAL';
+
   return (
     <div className="h-full w-full overflow-y-auto pb-24 px-6 py-8 lg:px-12 lg:py-10">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -151,7 +155,7 @@ export default function Orders() {
           </button>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <div className="space-y-6">
           {activeTab === 'food' && (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {FOOD_PARTNERS.map((partner) => (
@@ -160,7 +164,7 @@ export default function Orders() {
                 href={partner.url}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="group rounded-[2rem] border border-white/10 bg-dark-800/90 p-6 transition-all duration-300 hover:border-primary-500/40 hover:bg-white/5"
+                className="group rounded-[2rem] border border-white/10 bg-dark-800/90 p-6 transition-all duration-300 hover:border-primary-500/40 hover:bg-white/5 flex flex-col justify-between min-h-[260px]"
               >
                 <div className={`inline-flex items-center justify-center rounded-3xl bg-gradient-to-br ${partner.accent} p-4 text-2xl shadow-lg shadow-white/5`}>{partner.icon}</div>
                 <div className="mt-6">
@@ -195,7 +199,7 @@ export default function Orders() {
                   href={partner.url}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="group rounded-[2rem] border border-white/10 bg-dark-800/90 p-6 transition-all duration-300 hover:border-primary-500/40 hover:bg-white/5"
+                  className="group rounded-[2rem] border border-white/10 bg-dark-800/90 p-6 transition-all duration-300 hover:border-primary-500/40 hover:bg-white/5 flex flex-col justify-between min-h-[260px]"
                 >
                   <div className={`inline-flex items-center justify-center rounded-3xl bg-gradient-to-br ${partner.accent} p-4 text-2xl shadow-lg shadow-white/5`}>{partner.icon}</div>
                   <div className="mt-6">
@@ -231,7 +235,7 @@ export default function Orders() {
                   href={partner.url}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="group rounded-[2rem] border border-white/10 bg-dark-800/90 p-6 transition-all duration-300 hover:border-primary-500/40 hover:bg-white/5"
+                  className="group rounded-[2rem] border border-white/10 bg-dark-800/90 p-6 transition-all duration-300 hover:border-primary-500/40 hover:bg-white/5 flex flex-col justify-between min-h-[260px]"
                 >
                   <div className={`inline-flex items-center justify-center rounded-3xl bg-gradient-to-br ${partner.accent} p-4 text-2xl shadow-lg shadow-white/5`}>{partner.icon}</div>
                   <div className="mt-6">
