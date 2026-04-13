@@ -179,7 +179,7 @@ export default function Profile() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 bg-white/5 rounded-xl">
                   <p className="text-xs text-slate-400 uppercase tracking-wider">Gate</p>
-                  <p className="text-white font-bold text-xl">{userState?.gate || 'Gate 4'}</p>
+                  <p className="text-white font-bold text-xl">{userState?.gate || 'Not assigned'}</p>
                 </div>
                 <div className="p-4 bg-white/5 rounded-xl">
                   <p className="text-xs text-slate-400 uppercase tracking-wider">Seat</p>

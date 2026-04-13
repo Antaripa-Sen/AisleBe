@@ -21,7 +21,7 @@ const EXIT_COORD = [-0.2700, 51.5520];
 export default function MapScreen() {
   const { userState } = useUser();
   const { gameState } = useSimulation();
-  const currentGate = userState?.gate || "Gate 4";
+  const currentGate = userState?.gate || "Unknown";
   const [viewMode, setViewMode] = useState('arrival'); // arrival, heatmap
   const [userLocation, setUserLocation] = useState(null);
   const [locationError, setLocationError] = useState('');

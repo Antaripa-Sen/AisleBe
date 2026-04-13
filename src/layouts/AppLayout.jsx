@@ -15,8 +15,12 @@ export default function AppLayout() {
     { to: '/wallet', icon: WalletIcon, label: 'Wallet' },
   ];
 
+  const layoutBg = theme === 'light'
+    ? 'bg-[radial-gradient(ellipse_at_top_right,_rgba(226,232,240,0.8),_rgba(148,163,184,0.12))]'
+    : 'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-dark-800 via-dark-900 to-black';
+
   return (
-    <div className={`flex-1 flex flex-col md:flex-row h-full w-full relative overflow-hidden ${theme === 'light' ? 'bg-[radial-gradient(ellipse_at_top_right,_rgba(226,232,240,0.8),_rgba(148,163,184,0.12))]' : 'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-dark-800 via-dark-900 to-black`} `}>
+    <div className={`flex-1 flex flex-col md:flex-row h-full w-full relative overflow-hidden ${layoutBg}`}>
       
       {/* Desktop/Tablet Sidebar */}
       <nav className={`hidden md:flex flex-col w-24 lg:w-64 h-full border-r ${theme === 'light' ? 'border-slate-200 bg-slate-50/90 text-slate-900' : 'border-white/5 bg-dark-900/60 text-slate-400'} backdrop-blur-2xl z-50 shrink-0`}>

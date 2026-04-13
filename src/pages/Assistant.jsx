@@ -11,7 +11,7 @@ const getAssistantReply = (text, { userState, gameState }) => {
   const foodPref = userState?.foodPref || 'any';
 
   if (/(exit|egress|leave|route|depart|out of here)/i.test(lower)) {
-    return `The fastest exit path is through ${userState?.gate || 'Gate 4'}. Use the Exit screen for live ride bookings and optimized routes.`;
+    return `The fastest exit path is through ${userState?.gate || 'your assigned gate'}. Use the Exit screen for live ride bookings and optimized routes.`;
   }
 
   if (/(food|order|eat|meal|delivery)/i.test(lower)) {
