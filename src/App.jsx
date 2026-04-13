@@ -4,6 +4,8 @@ import { UserProvider } from './context/UserContext';
 import { SimulationProvider } from './context/SimulationContext';
 import AppLayout from './layouts/AppLayout';
 import Onboarding from './pages/Onboarding';
+import Login from './pages/Login';
+import Profile from './pages/Profile';
 import Home from './pages/Home';
 import MapView from './pages/MapScreen';
 import Assistant from './pages/Assistant';
@@ -18,11 +20,13 @@ function App() {
         <BrowserRouter>
           <div className="h-[100dvh] w-[100vw] bg-dark-900 overflow-hidden flex relative font-sans text-slate-100 selection:bg-primary-500/30">
             <Routes>
-              <Route path="/" element={<Navigate to="/onboarding" replace />} />
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="/login" element={<Login />} />
               <Route path="/onboarding" element={<Onboarding />} />
               
               <Route element={<AppLayout />}>
                 <Route path="/home" element={<Home />} />
+                <Route path="/profile" element={<Profile />} />
                 <Route path="/map" element={<MapView />} />
                 <Route path="/assistant" element={<Assistant />} />
                 <Route path="/orders" element={<Orders />} />

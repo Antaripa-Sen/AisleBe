@@ -37,6 +37,14 @@ export default function Exit() {
 
   const EXIT_COORD = [-0.2700, 51.5520];
 
+  const RIDE_PROVIDERS = [
+    { id: 'uber', name: 'Uber', url: 'https://m.uber.com', description: 'Open Uber to request a ride from your gate' },
+    { id: 'ola', name: 'Ola', url: 'https://www.olacabs.com', description: 'Open Ola to book a local cab quickly' }
+  ];
+
+  const gateCoords = GATE_COORDS[currentGate] || [-0.2795, 51.5560];
+  const routeOrigin = userLocation ? [userLocation.lng, userLocation.lat] : gateCoords;
+
   useEffect(() => {
     if (!navigator.geolocation) {
       setLocationError('Geolocation unsupported.');
@@ -70,21 +78,21 @@ export default function Exit() {
 
        map.current.on('style.load', () => {
            map.current.addSource('escape-route', {
-              'type': 'geojson',
-              'data': {
-                 'type': 'Feature',
-                 'geometry': {
-                    'type': 'LineString',
-                    'coordinates': [origin, EXIT_COORD]
+              type: 'geojson',
+              data: {
+                 type: 'Feature',
+                 geometry: {
+                    type: 'LineString',
+                    coordinates: [origin, EXIT_COORD]
                  }
               }
            });
            map.current.addLayer({
-              'id': 'escape-layer',
-              'type': 'line',
-              'source': 'escape-route',
-              'layout': { 'line-join': 'round', 'line-cap': 'round' },
-              'paint': { 'line-color': plans[0].routeColor, 'line-width': 8, 'line-opacity': 0.8 }
+              id: 'escape-layer',
+              type: 'line',
+              source: 'escape-route',
+              layout: { 'line-join': 'round', 'line-cap': 'round' },
+              paint: { 'line-color': plans[selectedPlan].routeColor, 'line-width': 8, 'line-opacity': 0.8 }
            });
 
            if (userLocation) {
@@ -113,7 +121,7 @@ export default function Exit() {
          }
        });
      }
-  }, [currentGate, userLocation]);
+  }, [currentGate, userLocation, selectedPlan]);
 
   // Update line color based on selected plan
   useEffect(() => {
@@ -208,20 +216,35 @@ export default function Exit() {
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="p-6 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between shadow-lg">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
                      <Car size={24} />
                   </div>
                   <div>
                     <h4 className="text-lg font-black text-white">{plans[selectedPlan].carEta} Arrival</h4>
-                    <p className="text-xs text-slate-400 font-medium mt-0.5">Rideshare Target Zone</p>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">{plans[selectedPlan].wait} wait | {plans[selectedPlan].crowd} crowd</p>
                   </div>
                 </div>
-                <button className="bg-white text-dark-900 px-5 py-2.5 rounded-xl font-bold hover:bg-slate-200 transition-colors">Book</button>
+                <div className="flex flex-wrap gap-3">
+                  {RIDE_PROVIDERS.map((provider) => (
+                    <a
+                      key={provider.id}
+                      href={provider.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="rounded-2xl bg-white text-dark-900 px-4 py-2 text-sm font-bold hover:bg-slate-200 transition"
+                    >
+                      {provider.name}
+                    </a>
+                  ))}
+                </div>
               </div>
 
-              <button className="w-full h-full bg-primary-600 hover:bg-primary-500 text-white font-black text-xl py-6 rounded-[2rem] shadow-[0_15px_40px_rgba(14,165,233,0.3)] flex items-center justify-center gap-3 transition-transform hover:-translate-y-1">
-                <Navigation2 size={24} /> Execute Route
+              <button
+                onClick={() => window.open(`https://www.google.com/maps/dir/${routeOrigin[1]},${routeOrigin[0]}/${EXIT_COORD[1]},${EXIT_COORD[0]}`, '_blank')}
+                className="w-full h-full bg-primary-600 hover:bg-primary-500 text-white font-black text-xl py-6 rounded-[2rem] shadow-[0_15px_40px_rgba(14,165,233,0.3)] flex items-center justify-center gap-3 transition-transform hover:-translate-y-1"
+              >
+                <Navigation2 size={24} /> Open directions
               </button>
            </div>
         </div>

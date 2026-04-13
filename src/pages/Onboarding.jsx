@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
+import { useSimulation } from '../context/SimulationContext';
 import { MapPin, Utensils, Train, Accessibility, ArrowRight, ShieldCheck, Ticket } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { saveUser } = useUser();
+  const { saveUser, isAuthenticated } = useUser();
+  const { gameState } = useSimulation();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/home');
+    }
+  }, [isAuthenticated, navigate]);
+
   const [formData, setFormData] = useState({
     seat: '',
     foodPref: 'snacks',
@@ -20,9 +29,11 @@ export default function Onboarding() {
     e.preventDefault();
     const finalSeat = formData.seat.trim() || 'GUEST';
     
-    // Auto-calculate recommended gate for simulation
-    const gateNum = (finalSeat.charCodeAt(0) % 4) + 1 || 4;
-    saveUser({ ...formData, seat: finalSeat, gate: `Gate ${gateNum}` });
+    // Get available gates from real-time data
+    const availableGates = Object.keys(gameState?.venue?.gates || {});
+    const assignedGate = availableGates.length > 0 ? availableGates[Math.floor(Math.random() * availableGates.length)] : 'Gate 4';
+    
+    saveUser({ ...formData, seat: finalSeat, gate: assignedGate });
     navigate('/home');
   };
 
@@ -82,8 +93,13 @@ export default function Onboarding() {
                 <Ticket className="text-white" size={28} />
              </div>
              <div>
-                <p className="text-slate-400 text-xs uppercase tracking-widest font-bold">Upcoming Event Found</p>
-                <h3 className="text-white font-bold text-lg mt-0.5">Championship Final 2025</h3>
+                <p className="text-slate-400 text-xs uppercase tracking-widest font-bold">Upcoming Event</p>
+                <h3 className="text-white font-bold text-lg mt-0.5">
+                  {gameState?.venue?.matchInfo?.homeTeam && gameState?.venue?.matchInfo?.awayTeam
+                    ? `${gameState.venue.matchInfo.homeTeam} vs ${gameState.venue.matchInfo.awayTeam}`
+                    : 'Live match unavailable'}
+                </h3>
+                <p className="text-slate-500 text-xs mt-1">{gameState?.venue?.matchInfo?.minute ? `Live now — ${gameState.venue.matchInfo.minute} min` : 'Fetching current game details...'}</p>
              </div>
           </div>
         </div>

@@ -1,10 +1,11 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Home, Map, MessageSquare, ShoppingBag, DoorOpen, Wallet as WalletIcon } from 'lucide-react';
+import { Home, Map, MessageSquare, ShoppingBag, DoorOpen, Wallet as WalletIcon, User } from 'lucide-react';
 
 export default function AppLayout() {
   const navItems = [
     { to: '/home', icon: Home, label: 'Home' },
+    { to: '/profile', icon: User, label: 'Profile' },
     { to: '/map', icon: Map, label: 'Map' },
     { to: '/assistant', icon: MessageSquare, label: 'Assistant' },
     { to: '/orders', icon: ShoppingBag, label: 'Orders' },
