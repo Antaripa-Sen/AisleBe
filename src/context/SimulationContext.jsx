@@ -37,7 +37,7 @@ export function SimulationProvider({ children }) {
       }
     }, (error) => {
       console.error("Firebase read failure:", error);
-      setDbError(true);
+      // Don't set dbError to true, just log and continue with default data
     });
 
     return () => unsubscribe();
@@ -49,15 +49,6 @@ export function SimulationProvider({ children }) {
        alerts: prev.alerts.filter(a => a.id !== id)
     }));
   };
-
-  if (dbError) {
-     return (
-        <div className="min-h-screen bg-dark-900 flex items-center justify-center p-8 flex-col text-center">
-           <h1 className="text-rose-500 text-3xl font-black mb-4">API Configuration Missing</h1>
-           <p className="text-slate-400 max-w-md">The strict real-time integration requires valid Firebase credentials. Please populate your <code className="bg-slate-800 px-2 py-1 rounded text-white text-sm">.env.local</code> file and restart the server.</p>
-        </div>
-     );
-  }
 
   return (
     <SimulationContext.Provider value={{ gameState, dismissAlert }}>
