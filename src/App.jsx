@@ -1,17 +1,26 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserProvider, useUser } from './context/UserContext';
 import { SimulationProvider } from './context/SimulationContext';
 import AppLayout from './layouts/AppLayout';
-import Onboarding from './pages/Onboarding';
-import Login from './pages/Login';
-import Profile from './pages/Profile';
-import Home from './pages/Home';
-import MapView from './pages/MapScreen';
-import Assistant from './pages/Assistant';
-import Orders from './pages/Orders';
-import Exit from './pages/Exit';
-import Wallet from './pages/Wallet';
+
+// Lazy load pages
+const Onboarding = lazy(() => import('./pages/Onboarding'));
+const Login = lazy(() => import('./pages/Login'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Home = lazy(() => import('./pages/Home'));
+const MapView = lazy(() => import('./pages/MapScreen'));
+const Assistant = lazy(() => import('./pages/Assistant'));
+const Orders = lazy(() => import('./pages/Orders'));
+const Exit = lazy(() => import('./pages/Exit'));
+const Wallet = lazy(() => import('./pages/Wallet'));
+
+// Loading component
+const LoadingSpinner = () => (
+  <div className="min-h-screen bg-dark-900 flex items-center justify-center">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+  </div>
+);
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -59,21 +68,23 @@ function AppContent() {
   return (
     <BrowserRouter>
       <div className={`h-[100dvh] w-[100vw] overflow-hidden flex relative font-sans selection:bg-primary-500/30 ${theme === 'light' ? 'bg-slate-100 text-slate-900' : 'bg-dark-900 text-slate-100'}`}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/login" element={isAuthenticated ? <Navigate to="/home" replace /> : <Login />} />
-          <Route path="/onboarding" element={isAuthenticated ? <Navigate to="/home" replace /> : <Onboarding />} />
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/login" element={isAuthenticated ? <Navigate to="/home" replace /> : <Login />} />
+            <Route path="/onboarding" element={isAuthenticated ? <Navigate to="/home" replace /> : <Onboarding />} />
 
-          <Route element={isAuthenticated ? <AppLayout /> : <Navigate to="/login" replace />}>
-            <Route path="/home" element={<Home />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/map" element={<MapView />} />
-            <Route path="/assistant" element={<Assistant />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/exit" element={<Exit />} />
-            <Route path="/wallet" element={<Wallet />} />
-          </Route>
-        </Routes>
+            <Route element={isAuthenticated ? <AppLayout /> : <Navigate to="/login" replace />}>
+              <Route path="/home" element={<Home />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/map" element={<MapView />} />
+              <Route path="/assistant" element={<Assistant />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/exit" element={<Exit />} />
+              <Route path="/wallet" element={<Wallet />} />
+            </Route>
+          </Routes>
+        </Suspense>
       </div>
     </BrowserRouter>
   );

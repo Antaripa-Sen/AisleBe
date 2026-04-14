@@ -1,15 +1,18 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set } from "firebase/database";
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBaxthnJSLhkjkLF8_bXNVkc_YKB3E70yA",
-  authDomain: "aislebe.firebaseapp.com",
-  databaseURL: "https://aislebe-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "aislebe",
-  storageBucket: "aislebe.firebasestorage.app",
-  messagingSenderId: "640023929786",
-  appId: "1:640023929786:web:968124c68474c8538f7383",
-  measurementId: "G-X5D49KX8G1"
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: process.env.VITE_FIREBASE_DATABASE_URL,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID,
+  measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 const app = initializeApp(firebaseConfig);
