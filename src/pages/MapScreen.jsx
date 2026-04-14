@@ -149,7 +149,7 @@ export default function MapScreen() {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
+    const watcher = navigator.geolocation.watchPosition(
       (position) => {
         setUserLocation({
           lat: position.coords.latitude,
@@ -159,8 +159,12 @@ export default function MapScreen() {
       (error) => {
         setLocationError(error.message || 'Unable to access location.');
       },
-      { enableHighAccuracy: true, timeout: 15000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
     );
+
+    return () => {
+      if (watcher) navigator.geolocation.clearWatch(watcher);
+    };
   }, []);
 
   useEffect(() => {

@@ -146,6 +146,13 @@ export default function Home() {
     return score[b.crowdLevel] - score[a.crowdLevel];
   });
 
+  const gateStatusList = [...gatesList]
+    .map((gate) => ({
+      ...gate,
+      score: gate.crowdLevel === 'high' ? 3 : gate.crowdLevel === 'medium' ? 2 : 1,
+    }))
+    .sort((a, b) => b.score - a.score);
+
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -194,80 +201,80 @@ export default function Home() {
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[minmax(180px,auto)]"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[minmax(240px,auto)]"
       >
 
         {/* Welcome Card (Hero) */}
         <motion.div
           variants={itemVariants}
-          className={`md:col-span-2 lg:col-span-2 row-span-2 rounded-[2rem] p-8 flex flex-col relative overflow-hidden group ${cardBg}`}
+          className={`h-full md:col-span-2 lg:col-span-2 row-span-2 rounded-[2rem] p-8 lg:p-10 relative overflow-hidden ${theme === 'light' ? 'bg-white border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.08)]' : 'bg-dark-900/95 border border-white/10 shadow-[0_30px_80px_rgba(0,0,0,0.55)]'}`}
         >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:bg-primary-500/20 transition-all duration-700" />
-
-          <div className="flex-1">
-            <p className={`font-semibold tracking-widest uppercase text-xs mb-2 ${theme === 'light' ? 'text-primary-600' : 'text-primary-300'}`}>Welcome Back</p>
-            <h1 className={`text-4xl md:text-5xl lg:text-6xl font-black leading-tight mb-2 ${textPrimary}`}>
-              Seat{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-sky-300">
-                {userState?.seat || 'Guest'}
-              </span>
-            </h1>
-            <p className={`${theme === 'light' ? 'text-slate-600' : 'text-slate-400'} md:text-lg max-w-sm hidden md:block`}>
-              Your personalized stadium experience is active. Enjoy the match.
-            </p>
-          </div>
-
-          <div className="mt-auto pt-8">
-            <div className={`p-4 md:p-5 rounded-2xl flex items-center gap-4 relative overflow-hidden border ${theme === 'light' ? 'bg-white/90 border-slate-200/40 text-slate-900' : 'bg-primary-500/5 border-primary-500/30 text-white'}`}>
-              <div className="w-12 h-12 rounded-full bg-primary-500/20 flex items-center justify-center shrink-0 border border-primary-400/50">
-                <Navigation size={24} className="text-primary-400 animate-pulse" />
-              </div>
+          <div className="relative z-10 grid gap-6 h-full">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
               <div>
-                <h3 className={`text-sm md:text-base font-bold ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Smart Suggestion Active</h3>
-                {smartSuggestionGate ? (
-                  <>
-                    <p className="text-xs md:text-sm text-slate-300 mt-1 leading-relaxed">
-                      Enter via <strong>{smartSuggestionGate}</strong> for the fastest route to your seat right now.
-                    </p>
-                    <p className="text-xs md:text-sm text-slate-300 mt-2 leading-relaxed">
-                      {smartSuggestionText}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-xs md:text-sm text-slate-300 mt-1 leading-relaxed">
-                    Waiting for live gate data to suggest the best entry point.
-                  </p>
-                )}
+                <p className={`font-semibold tracking-[0.35em] uppercase text-xs ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>Stadium Control Center</p>
+                <h1 className={`mt-4 text-4xl md:text-5xl font-black ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>
+                  Hello, {userState?.name || 'Spectator'}
+                </h1>
+                <p className={`mt-4 max-w-2xl leading-7 ${theme === 'light' ? 'text-slate-600' : 'text-slate-300'}`}>
+                  Live crowd insights, gate guidance, and real-time match updates all in one place.
+                </p>
+              </div>
+
+              <div className={`rounded-[2rem] border p-5 ${theme === 'light' ? 'bg-slate-50 border-slate-200' : 'bg-dark-800/85 border-white/10'}`}>
+                <p className={`text-[0.65rem] uppercase tracking-[0.35em] ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>Assigned Gate</p>
+                <p className={`mt-4 text-3xl font-black ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{userState?.gate || detectedGate || 'Not assigned'}</p>
+                <p className={`mt-2 text-sm ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Chosen based on your current location.</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className={`rounded-[2rem] border p-5 ${theme === 'light' ? 'bg-slate-50 border-slate-200' : 'bg-dark-800/85 border-white/10'}`}>
+                <p className={`text-xs uppercase tracking-[0.3em] ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>Nearby Gates</p>
+                <p className={`mt-3 text-3xl font-black ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{nearbyGates.length || 0}</p>
+                <p className={`mt-2 text-sm ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Gates within 200m of where you are.</p>
+              </div>
+              <div className={`rounded-[2rem] border p-5 ${theme === 'light' ? 'bg-slate-50 border-slate-200' : 'bg-dark-800/85 border-white/10'}`}>
+                <p className={`text-xs uppercase tracking-[0.3em] ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>Crowd Status</p>
+                <p className={`mt-3 text-3xl font-black ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{crowdLabel}</p>
+                <p className={`mt-2 text-sm ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>{crowdPercentage}% average density nearby.</p>
               </div>
             </div>
           </div>
         </motion.div>
 
-        {/* Nearby Crowded Places */}
+        {/* Live Gate Status */}
         <motion.div
           variants={itemVariants}
-          className={`rounded-[2rem] p-6 flex flex-col justify-between ${cardBg}`}
+          className={`h-full rounded-[2rem] p-6 flex flex-col justify-between ${cardBg}`}
         >
           <div>
-            <p className={`text-xs font-bold uppercase tracking-[0.3em] mb-4 ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>Nearby Crowded Places</p>
-            {nearbyCrowdedGates.length ? (
-              <div className="space-y-3">
-                {nearbyCrowdedGates.slice(0, 3).map((gate) => (
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className={`text-xs font-bold uppercase tracking-[0.3em] ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>Gate Status</p>
+                <p className={`mt-2 text-base font-semibold ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Live updates</p>
+              </div>
+              <span className={`text-[0.65rem] uppercase tracking-[0.35em] font-semibold ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>Auto refresh</span>
+            </div>
+
+            {gateStatusList.length ? (
+              <div className="mt-6 space-y-3">
+                {gateStatusList.slice(0, 4).map((gate) => (
                   <div
                     key={gate.name}
-                    className={`rounded-3xl p-4 ${theme === 'light' ? 'bg-slate-100/80 border-slate-200/60' : 'bg-white/5 border-white/10'} flex items-center justify-between gap-4`}
+                    className={`rounded-3xl p-4 ${theme === 'light' ? 'bg-slate-100/90 border-slate-200/60' : 'bg-white/5 border-white/10'} flex items-center justify-between gap-4`}
                   >
                     <div>
-                      <p className={`text-sm font-bold ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{gate.name}</p>
-                      <p className={`text-xs ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>Current flow: {gate.crowdLevel}</p>
+                      <p className={`text-sm font-semibold ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{gate.name}</p>
+                      <p className={`text-xs ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>{gate.status || 'Open'}</p>
                     </div>
                     <span
-                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
                         gate.crowdLevel === 'high'
-                          ? 'bg-rose-500/20 text-rose-300'
+                          ? 'bg-rose-500/20 text-rose-600'
                           : gate.crowdLevel === 'medium'
-                            ? 'bg-amber-500/20 text-amber-300'
-                            : 'bg-emerald-500/20 text-emerald-300'
+                            ? 'bg-amber-500/20 text-amber-600'
+                            : 'bg-emerald-500/20 text-emerald-600'
                       }`}
                     >
                       {gate.crowdLevel.toUpperCase()}
@@ -276,22 +283,22 @@ export default function Home() {
                 ))}
               </div>
             ) : (
-              <p className={`text-sm ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Crowd data is loading from the stadium sensors.</p>
+              <p className={`mt-6 text-sm ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Crowd data is loading from the stadium sensors.</p>
             )}
           </div>
           <button
             type="button"
             onClick={() => navigate('/map')}
-            className="mt-6 w-full rounded-2xl bg-gradient-to-r from-primary-500 to-sky-500 px-5 py-4 text-sm font-bold text-white hover:from-primary-600 hover:to-sky-600 transition-all"
+            className="mt-6 w-full rounded-3xl bg-gradient-to-r from-primary-500 to-sky-500 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-primary-500/20 transition-all hover:from-primary-600 hover:to-sky-600"
           >
-            View live crowd map
+            Open live crowd map
           </button>
         </motion.div>
 
         {/* Live Score Bento */}
         <motion.div
           variants={itemVariants}
-          className={`md:col-span-2 lg:col-span-2 rounded-[2rem] p-6 lg:p-8 flex flex-col justify-between relative overflow-hidden bento-hover cursor-pointer group ${cardBg}`}
+          className={`h-full md:col-span-2 lg:col-span-2 rounded-[2rem] p-6 lg:p-8 flex flex-col justify-between relative overflow-hidden bento-hover cursor-pointer group ${cardBg}`}
         >
           <div className="absolute -inset-0.5 bg-gradient-to-br from-white/10 to-transparent rounded-[2rem] opacity-0 group-hover:opacity-100 transition duration-500 z-0" />
           <div className="relative z-10 flex justify-between items-center w-full">
@@ -317,7 +324,7 @@ export default function Home() {
         {/* Crowd Density Bento */}
         <motion.div
           variants={itemVariants}
-          className={`md:col-span-1 lg:col-span-1 h-full rounded-[2rem] p-6 flex flex-col items-center justify-center bento-hover ${cardBg}`}
+          className={`h-full md:col-span-1 lg:col-span-1 rounded-[2rem] p-6 flex flex-col items-center justify-center bento-hover ${cardBg}`}
         >
           <h3 className={`text-sm font-bold tracking-widest uppercase mb-6 w-full text-center ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
             Crowd Index
@@ -353,7 +360,7 @@ export default function Home() {
         <motion.div
           variants={itemVariants}
           onClick={() => navigate('/orders')}
-          className="md:col-span-1 lg:col-span-1 h-full bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-6 flex flex-col relative overflow-hidden bento-hover cursor-pointer group"
+          className="h-full md:col-span-1 lg:col-span-1 bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-6 flex flex-col relative overflow-hidden bento-hover cursor-pointer group"
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-700" />
           <div className="w-14 h-14 rounded-2xl bg-orange-500/20 flex items-center justify-center text-orange-400 mb-auto relative z-10">
@@ -369,7 +376,7 @@ export default function Home() {
         <motion.div
           variants={itemVariants}
           onClick={() => navigate('/exit')}
-          className="md:col-span-2 lg:col-span-2 glass-card rounded-[2rem] p-6 lg:p-8 flex items-center justify-between bento-hover cursor-pointer relative overflow-hidden group"
+          className="h-full md:col-span-2 lg:col-span-2 glass-card rounded-[2rem] p-6 lg:p-8 flex items-center justify-between bento-hover cursor-pointer relative overflow-hidden group"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/5 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <div className="flex items-center gap-6 relative z-10">
