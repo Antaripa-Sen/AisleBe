@@ -10,10 +10,14 @@ const MAPTILER_KEY = "7FIIPceVDt9GG4LY3oxW";
 maptilersdk.config.apiKey = MAPTILER_KEY;
 
 export default function Exit() {
-  const { userState } = useUser();
+  const { userState, theme } = useUser();
   const { gameState } = useSimulation();
   
   const currentGate = userState?.gate || "Gate 4";
+  const pageBg = theme === 'light' ? 'bg-slate-100 text-slate-900' : 'bg-dark-900 text-slate-100';
+  const panelBg = theme === 'light' ? 'bg-white/95 text-slate-900 border-slate-200/40' : 'bg-dark-900/90 text-white border-white/10';
+  const cardBg = theme === 'light' ? 'bg-white border-slate-200/70 text-slate-900' : 'bg-white/5 border-white/5 text-white';
+  const mutedText = theme === 'light' ? 'text-slate-600' : 'text-slate-400';
   const crowdLevel = gameState.venue.gates[currentGate]?.crowdLevel || 'high';
   const [userLocation, setUserLocation] = useState(null);
   const [locationError, setLocationError] = useState('');
@@ -131,11 +135,11 @@ export default function Exit() {
   }, [selectedPlan]);
 
   return (
-    <div className="h-full flex flex-col hide-scrollbar relative bg-dark-900 lg:p-12">
+    <div className={`h-full flex flex-col hide-scrollbar relative lg:p-12 ${pageBg}`}>
       
       <div className="pt-10 pb-6 px-6 lg:px-0 z-10 max-w-7xl mx-auto w-full">
-        <h1 className="text-3xl md:text-5xl font-black text-white">Egress Strategy</h1>
-        <p className="text-slate-400 text-sm md:text-base mt-2">Dynamic routing via {currentGate}</p>
+        <h1 className={`text-3xl md:text-5xl font-black ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Egress Strategy</h1>
+        <p className={`${mutedText} text-sm md:text-base mt-2`}>Dynamic routing via {currentGate}</p>
       </div>
 
       <div className="flex-1 px-6 lg:px-0 pb-32 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-6 auto-rows-max">
@@ -149,16 +153,20 @@ export default function Exit() {
                onClick={() => setSelectedPlan(plan.id)}
                className={`rounded-[2rem] p-6 lg:p-8 border transition-all cursor-pointer shadow-lg ${
                  selectedPlan === plan.id 
-                   ? 'bg-primary-500/10 border-primary-500/50 shadow-[0_0_30px_rgba(14,165,233,0.15)]' 
-                   : 'bg-white/5 border-white/5 hover:bg-white/10'
+                   ? theme === 'light' 
+                     ? 'bg-slate-100 border-slate-200 shadow-[0_0_30px_rgba(15,23,42,0.08)]' 
+                     : 'bg-primary-500/10 border-primary-500/50 shadow-[0_0_30px_rgba(14,165,233,0.15)]' 
+                   : theme === 'light' 
+                     ? 'bg-white border-slate-200/70 hover:bg-slate-50 text-slate-900' 
+                     : 'bg-white/5 border-white/5 hover:bg-white/10 text-white'
                }`}
              >
                <div className="flex justify-between items-start mb-6">
                  <div>
-                   <h3 className={`text-xl lg:text-2xl font-black ${selectedPlan === plan.id ? 'text-primary-400' : 'text-white'}`}>
+                   <h3 className={`text-xl lg:text-2xl font-black ${selectedPlan === plan.id ? 'text-primary-400' : theme === 'light' ? 'text-slate-900' : 'text-white'}`}>
                      {plan.title}
                    </h3>
-                   <div className="flex items-center gap-3 mt-3 text-xs lg:text-sm font-bold">
+                   <div className={`flex items-center gap-3 mt-3 text-xs lg:text-sm font-bold ${theme === 'light' ? 'text-slate-700' : ''}`}>
                      <span className={`px-2 py-1 flex items-center justify-center rounded uppercase tracking-widest border ${
                        plan.crowd === 'high' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 
                        plan.crowd === 'moderate' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 
@@ -179,12 +187,12 @@ export default function Exit() {
                
                <div className="flex items-center gap-6 mt-4">
                   <div>
-                     <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Wait Time</p>
-                     <p className="text-xl font-black text-white">{plan.wait}</p>
+                     <p className={`text-[10px] uppercase font-bold tracking-widest ${theme === 'light' ? 'text-slate-500' : 'text-slate-500'}`}>Wait Time</p>
+                     <p className={`text-xl font-black ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{plan.wait}</p>
                   </div>
                   <div>
-                     <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Walk ETA</p>
-                     <p className="text-xl font-black text-white">{plan.eta}</p>
+                     <p className={`text-[10px] uppercase font-bold tracking-widest ${theme === 'light' ? 'text-slate-500' : 'text-slate-500'}`}>Walk ETA</p>
+                     <p className={`text-xl font-black ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{plan.eta}</p>
                   </div>
                </div>
              </motion.div>
@@ -204,18 +212,18 @@ export default function Exit() {
                 <div ref={mapContainer} className="absolute inset-0 mix-blend-luminosity filter saturate-50 pointer-events-none" />
                 <div className="absolute inset-x-0 bottom-0 top-1/3 bg-gradient-to-t from-dark-900 to-transparent pointer-events-none"></div>
                 
-                <div className="relative text-white flex items-center gap-3 bg-dark-900/90 px-5 py-3 rounded-2xl border border-white/10 shadow-2xl backdrop-blur-xl">
+                <div className={`relative flex items-center gap-3 px-5 py-3 rounded-2xl border shadow-2xl backdrop-blur-xl ${theme === 'light' ? 'bg-white/90 border-slate-200/50 text-slate-900' : 'bg-dark-900/90 border-white/10 text-white'}`}>
                   <MapPin size={24} className="text-primary-400 animate-bounce" />
                   <div>
-                     <p className="text-sm font-black">Route Confirmed</p>
-                     <p className="text-xs text-slate-400 font-medium">Head towards {currentGate}</p>
+                     <p className={`text-sm font-black ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Route Confirmed</p>
+                     <p className={`${mutedText} text-xs font-medium`}>Head towards {currentGate}</p>
                   </div>
                 </div>
              </motion.div>
            </AnimatePresence>
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-6 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between shadow-lg">
+              <div className={`p-6 rounded-[2rem] border flex items-center justify-between shadow-lg ${theme === 'light' ? 'bg-slate-50 border-slate-200/70 text-slate-900' : 'bg-white/5 border-white/5 text-white'}`}>
                 <div className="flex flex-col sm:flex-row items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
                      <Car size={24} />
@@ -232,7 +240,7 @@ export default function Exit() {
                       href={provider.url}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="rounded-2xl bg-white text-dark-900 px-4 py-2 text-sm font-bold hover:bg-slate-200 transition"
+                      className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${theme === 'light' ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-white text-dark-900 hover:bg-slate-200'}`}
                     >
                       {provider.name}
                     </a>

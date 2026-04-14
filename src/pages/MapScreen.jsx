@@ -19,7 +19,7 @@ const GATE_COORDS = {
 const EXIT_COORD = [-0.2700, 51.5520];
 
 export default function MapScreen() {
-  const { userState } = useUser();
+  const { userState, theme } = useUser();
   const { gameState } = useSimulation();
   const currentGate = userState?.gate || "Unknown";
   const [viewMode, setViewMode] = useState('arrival'); // arrival, heatmap
@@ -28,6 +28,120 @@ export default function MapScreen() {
 
   const mapContainer = useRef(null);
   const map = useRef(null);
+  const mapMarkers = useRef([]);
+
+  const getGateColor = (level) => {
+    if (level === 'high') return '#ef4444';
+    if (level === 'medium') return '#f97316';
+    return '#22c55e';
+  };
+
+  const getCrowdDensity = (level) => {
+    if (level === 'high') return 1;
+    if (level === 'medium') return 0.6;
+    return 0.25;
+  };
+
+  const calculateDistance = (location, coords) => {
+    const dx = (location.lng - coords[0]) * 111320;
+    const dy = (location.lat - coords[1]) * 111320;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const getNearbyGateNames = () => {
+    const allGates = Object.keys(gameState.venue.gates || {});
+    if (!userLocation) return allGates;
+    return allGates.filter((gateName) => {
+      const coords = GATE_COORDS[gateName];
+      return coords ? calculateDistance(userLocation, coords) <= 200 : false;
+    });
+  };
+
+  const buildHeatmapFeatures = (gateNames) =>
+    gateNames.flatMap((gateName) => {
+      const gate = gameState.venue.gates?.[gateName] || {};
+      const gateCoords = GATE_COORDS[gateName] || [-0.2795, 51.5560];
+      const count = gate.crowdLevel === 'high' ? 24 : gate.crowdLevel === 'medium' ? 14 : 8;
+      const density = getCrowdDensity(gate.crowdLevel);
+      return Array.from({ length: count }, (_, index) => ({
+        type: 'Feature',
+        properties: { density },
+        geometry: {
+          type: 'Point',
+          coordinates: [
+            gateCoords[0] + ((index % 4) - 1.5) * 0.00004,
+            gateCoords[1] + (Math.floor(index / 4) - 1.5) * 0.00004
+          ]
+        }
+      }));
+    });
+
+  const getRouteSource = () => {
+    const gateCoords = GATE_COORDS[currentGate] || [-0.2795, 51.5560];
+    return userLocation ? [[userLocation.lng, userLocation.lat], gateCoords] : [gateCoords, EXIT_COORD];
+  };
+
+  const getPopupHtml = (gateName, gate) => {
+    const status = gate.status || 'Open';
+    return `
+      <div style="font-family: system-ui, sans-serif; color: #f8fafc; background: rgba(15,23,42,0.96); border-radius: 1rem; padding: 14px; min-width: 180px;">
+        <div style="font-size: 1rem; font-weight: 800; margin-bottom: 6px;">${gateName}</div>
+        <div style="font-size: 0.92rem; margin-bottom: 6px;">Crowd level: <strong>${gate.crowdLevel}</strong></div>
+        <div style="font-size: 0.83rem; color: #cbd5e1;">Status: ${status}</div>
+      </div>
+    `;
+  };
+
+  const clearGateMarkers = () => {
+    mapMarkers.current.forEach((marker) => marker.remove());
+    mapMarkers.current = [];
+  };
+
+  const createGateMarkers = () => {
+    clearGateMarkers();
+    Object.entries(gameState.venue.gates || {}).forEach(([gateName, gate]) => {
+      const coords = GATE_COORDS[gateName];
+      if (!coords || !map.current) return;
+      const marker = new maptilersdk.Marker({ color: getGateColor(gate.crowdLevel) })
+        .setLngLat(coords)
+        .setPopup(new maptilersdk.Popup({ offset: 25 }).setHTML(getPopupHtml(gateName, gate)))
+        .addTo(map.current);
+      mapMarkers.current.push(marker);
+    });
+  };
+
+  const refreshRoute = () => {
+    if (!map.current || !map.current.getSource('route')) return;
+    map.current.getSource('route').setData({
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: getRouteSource()
+      }
+    });
+  };
+
+  const refreshHeatmap = () => {
+    if (!map.current || !map.current.getSource('heatmap-points')) return;
+    const nearbyGateNames = getNearbyGateNames();
+    const heatmapGates = nearbyGateNames.length ? nearbyGateNames : Object.keys(gameState.venue.gates || {});
+    map.current.getSource('heatmap-points').setData({
+      type: 'FeatureCollection',
+      features: buildHeatmapFeatures(heatmapGates)
+    });
+  };
+
+  const setViewVisibility = () => {
+    if (!map.current) return;
+    if (viewMode === 'arrival') {
+      map.current.setLayoutProperty('route-layer', 'visibility', 'visible');
+      map.current.setLayoutProperty('crowd-heatmap', 'visibility', 'none');
+    } else {
+      map.current.setLayoutProperty('route-layer', 'visibility', 'none');
+      map.current.setLayoutProperty('crowd-heatmap', 'visibility', 'visible');
+    }
+  };
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -68,6 +182,9 @@ export default function MapScreen() {
     });
 
     map.current.on('style.load', () => {
+      const initialRouteVisibility = viewMode === 'heatmap' ? 'none' : 'visible';
+      const initialHeatmapVisibility = viewMode === 'heatmap' ? 'visible' : 'none';
+
       map.current.addSource('route', {
         type: 'geojson',
         data: {
@@ -86,7 +203,8 @@ export default function MapScreen() {
         source: 'route',
         layout: {
           'line-join': 'round',
-          'line-cap': 'round'
+          'line-cap': 'round',
+          'visibility': initialRouteVisibility
         },
         paint: {
           'line-color': userState?.accessibility ? '#3b82f6' : '#0ea5e9',
@@ -107,6 +225,9 @@ export default function MapScreen() {
         id: 'crowd-heatmap',
         type: 'heatmap',
         source: 'heatmap-points',
+        layout: {
+          'visibility': initialHeatmapVisibility
+        },
         paint: {
           'heatmap-weight': 1,
           'heatmap-intensity': 1,
@@ -131,23 +252,8 @@ export default function MapScreen() {
           .addTo(map.current);
       }
 
-      // Add markers for all gates
-      Object.entries(gameState.venue.gates || {}).forEach(([gateName, gate]) => {
-        const coords = GATE_COORDS[gateName];
-        if (coords) {
-          const color = gate.crowdLevel === 'high' ? '#ef4444' : gate.crowdLevel === 'medium' ? '#f97316' : '#22c55e';
-          new maptilersdk.Marker({ color })
-            .setLngLat(coords)
-            .setPopup(new maptilersdk.Popup({ offset: 25 }).setHTML(`
-              <div class="text-sm">
-                <strong>${gateName}</strong><br>
-                Crowd: ${gate.crowdLevel}<br>
-                Status: ${gate.status || 'Open'}
-              </div>
-            `))
-            .addTo(map.current);
-        }
-      });
+      createGateMarkers();
+      refreshHeatmap();
 
       new maptilersdk.Marker({ color: '#f97316' })
         .setLngLat(gateCoords)
@@ -156,38 +262,15 @@ export default function MapScreen() {
     });
   }, [userLocation, locationError, currentGate, userState?.accessibility]);
 
-  // Handle live toggle switches for layers
+  // Handle live toggle switches and realtime updates
   useEffect(() => {
-     if (!map.current || !map.current.isStyleLoaded()) return;
+    if (!map.current || !map.current.isStyleLoaded()) return;
 
-     if (viewMode === 'arrival') {
-        map.current.setLayoutProperty('route-layer', 'visibility', 'visible');
-        map.current.setLayoutProperty('crowd-heatmap', 'visibility', 'none');
-     } else {
-        map.current.setLayoutProperty('route-layer', 'visibility', 'none');
-        map.current.setLayoutProperty('crowd-heatmap', 'visibility', 'visible');
-        
-        const features = Object.entries(gameState.venue.gates).flatMap(([gateName, gate]) => {
-          const gateCoords = GATE_COORDS[gateName] || [-0.2795, 51.5560];
-          const count = gate.crowdLevel === 'high' ? 20 : gate.crowdLevel === 'medium' ? 12 : 6;
-          return Array.from({ length: count }, (_, index) => ({
-            type: 'Feature',
-            properties: {
-              density: gate.crowdLevel === 'high' ? 1 : gate.crowdLevel === 'medium' ? 0.6 : 0.25
-            },
-            geometry: {
-              type: 'Point',
-              coordinates: [
-                gateCoords[0] + ((index % 3) - 1) * 0.00005,
-                gateCoords[1] + (Math.floor(index / 3) - 1) * 0.00005
-              ]
-            }
-          }));
-        });
-
-        map.current.getSource('heatmap-points').setData({ type: 'FeatureCollection', features });
-     }
-  }, [viewMode, gameState.venue.gates]);
+    setViewVisibility();
+    refreshRoute();
+    refreshHeatmap();
+    createGateMarkers();
+  }, [viewMode, userLocation, gameState.venue.gates, currentGate]);
 
   const nearbyCrowdedGates = Object.entries(gameState.venue.gates || {})
     .map(([name, gate]) => ({ name, ...gate }))
@@ -196,33 +279,38 @@ export default function MapScreen() {
       return score[b.crowdLevel] - score[a.crowdLevel];
     });
 
+  const pageBg = theme === 'light' ? 'bg-slate-100 text-slate-900' : 'bg-dark-900 text-slate-100';
+  const mapContainerClass = theme === 'light' ? 'w-full h-full absolute inset-0' : 'w-full h-full absolute inset-0 mix-blend-luminosity filter saturate-50';
+  const overlayGradient = theme === 'light' ? 'bg-gradient-to-t from-slate-100 to-transparent' : 'bg-gradient-to-t from-dark-900 to-transparent';
+  const panelBg = theme === 'light' ? 'bg-white/90 text-slate-900 border-slate-200/40' : 'bg-dark-800/80 text-white border-white/10';
+
   return (
-    <div className="h-full w-full flex flex-col relative bg-dark-900 overflow-hidden">
+    <div className={`h-full w-full flex flex-col relative overflow-hidden ${pageBg}`}>
       
       {/* Live Map Layer */}
       <div className="absolute inset-0 z-0">
-         <div ref={mapContainer} className="w-full h-full absolute inset-0 mix-blend-luminosity filter saturate-50" />
-         <div className="absolute inset-x-0 bottom-0 top-2/3 bg-gradient-to-t from-dark-900 to-transparent pointer-events-none"></div>
+         <div ref={mapContainer} className={mapContainerClass} />
+         <div className={`absolute inset-x-0 bottom-0 top-2/3 ${overlayGradient} pointer-events-none`} />
       </div>
 
       {/* Floating Header */}
       <div className="absolute top-0 inset-x-0 pt-6 px-6 lg:pt-10 lg:px-12 z-20 pointer-events-none flex justify-between items-start">
         <div>
-           <h1 className="text-3xl md:text-5xl font-black text-white drop-shadow-2xl">Venue Tracker</h1>
-           <p className="text-slate-300 font-bold tracking-widest mt-1 text-sm md:text-base drop-shadow-md">LIVE MAPTILER ENGINE</p>
+           <h1 className={`text-3xl md:text-5xl font-black drop-shadow-2xl ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Venue Tracker</h1>
+           <p className={`font-bold tracking-widest mt-1 text-sm md:text-base drop-shadow-md ${theme === 'light' ? 'text-slate-600' : 'text-slate-300'}`}>LIVE MAPTILER ENGINE</p>
         </div>
         
         {/* Toggle Switch */}
-        <div className="pointer-events-auto bg-dark-800/80 backdrop-blur-2xl p-1.5 rounded-full border border-white/10 flex items-center shadow-2xl">
+        <div className={`pointer-events-auto ${panelBg} backdrop-blur-2xl p-1.5 rounded-full border flex items-center shadow-2xl`}>
           <button 
              onClick={() => setViewMode('arrival')}
-             className={`px-4 lg:px-6 py-2.5 rounded-full text-xs lg:text-sm font-bold transition-all ${viewMode === 'arrival' ? 'bg-white text-dark-900 shadow-[0_5px_15px_rgba(255,255,255,0.2)]' : 'text-slate-400 hover:text-white'}`}
+             className={`px-4 lg:px-6 py-2.5 rounded-full text-xs lg:text-sm font-bold transition-all ${viewMode === 'arrival' ? `${theme === 'light' ? 'bg-white text-slate-900 shadow-[0_5px_15px_rgba(15,23,42,0.18)]' : 'bg-slate-900 text-white shadow-[0_5px_15px_rgba(255,255,255,0.12)]'}` : `${theme === 'light' ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'}`}`}
           >
              Routing
           </button>
           <button 
              onClick={() => setViewMode('heatmap')}
-             className={`px-4 lg:px-6 py-2.5 rounded-full text-xs lg:text-sm font-bold transition-all ${viewMode === 'heatmap' ? 'bg-primary-600 text-white shadow-[0_5px_15px_rgba(14,165,233,0.4)]' : 'text-slate-400 hover:text-white'}`}
+             className={`px-4 lg:px-6 py-2.5 rounded-full text-xs lg:text-sm font-bold transition-all ${viewMode === 'heatmap' ? 'bg-primary-600 text-white shadow-[0_5px_15px_rgba(14,165,233,0.4)]' : `${theme === 'light' ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white'}`}`}
           >
              Heatmap
           </button>
@@ -236,15 +324,15 @@ export default function MapScreen() {
             initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}
             className="absolute bottom-24 lg:bottom-12 inset-x-4 max-w-xl mx-auto z-30 pointer-events-auto"
           >
-            <div className="bg-dark-800/90 backdrop-blur-2xl p-6 rounded-[2rem] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.6)] flex items-center justify-between">
+            <div className={`backdrop-blur-2xl p-6 rounded-[2rem] border shadow-[0_30px_60px_rgba(0,0,0,0.6)] flex items-center justify-between ${panelBg}`}>
               <div className="flex items-center gap-5">
                 <div className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 border border-white/10 ${userState?.accessibility ? 'bg-blue-500/20 text-blue-400' : 'bg-primary-500/20 text-primary-400'}`}>
                   {userState?.accessibility ? <Layers size={24} /> : <Navigation size={24} />}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                     <h3 className="text-white font-black text-lg lg:text-xl">Target: {userState?.seat}</h3>
-                     {userState?.accessibility && <span className="bg-blue-500 text-white text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded">ADA Active</span>}
+                     <h3 className={`font-black text-lg lg:text-xl ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Target: {userState?.seat}</h3>
+                     {userState?.accessibility && <span className={`bg-blue-500 ${theme === 'light' ? 'text-white' : 'text-white'} text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded`}>ADA Active</span>}
                   </div>
                   <p className="text-slate-400 text-sm mt-1">{currentGate} • Dynamic Route Active</p>
                   <p className="text-slate-400 text-xs mt-1 uppercase tracking-[0.2em]">
@@ -254,9 +342,9 @@ export default function MapScreen() {
                   </p>
                 </div>
               </div>
-              <div className="hidden sm:block text-right border-l border-white/10 pl-6">
-                 <div className="text-2xl font-black text-white">Live</div>
-                 <p className="text-[10px] font-bold tracking-widest text-emerald-400 uppercase mt-1">MapTiler</p>
+              <div className={`hidden sm:block text-right border-l ${theme === 'light' ? 'border-slate-200/70' : 'border-white/10'} pl-6`}>
+                 <div className={`text-2xl font-black ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Live</div>
+                 <p className={`text-[10px] font-bold tracking-widest uppercase mt-1 ${theme === 'light' ? 'text-slate-600' : 'text-emerald-400'}`}>MapTiler</p>
               </div>
             </div>
           </motion.div>
@@ -267,21 +355,21 @@ export default function MapScreen() {
             initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}
             className="absolute bottom-24 lg:bottom-12 inset-x-4 max-w-xl mx-auto z-30 pointer-events-auto"
           >
-            <div className="bg-dark-800/95 backdrop-blur-2xl p-6 rounded-[2rem] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.6)] space-y-4">
+            <div className={`backdrop-blur-2xl p-6 rounded-[2rem] border shadow-[0_30px_60px_rgba(0,0,0,0.6)] space-y-4 ${theme === 'light' ? 'bg-white/95 border-slate-200/50 text-slate-900' : 'bg-dark-800/95 border-white/10 text-white'}`}>
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Nearby crowded zones</p>
-                  <h3 className="text-xl lg:text-2xl font-black text-white">Live crowd heatmap</h3>
+                  <h3 className={`text-xl lg:text-2xl font-black ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Live crowd heatmap</h3>
                 </div>
                 <span className="inline-flex items-center rounded-full bg-rose-500/10 text-rose-300 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em]">Updated in real time</span>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {nearbyCrowdedGates.slice(0, 2).map((gate) => (
-                  <div key={gate.name} className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                    <p className="text-sm text-slate-400 uppercase tracking-[0.2em] mb-2">{gate.name}</p>
+                  <div key={gate.name} className={`rounded-3xl border p-4 ${theme === 'light' ? 'border-slate-200/60 bg-slate-100/80' : 'border-white/10 bg-white/5'}`}>
+                    <p className={`text-sm uppercase tracking-[0.2em] mb-2 ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>{gate.name}</p>
                     <div className="flex items-center justify-between gap-4">
-                      <p className="text-lg font-bold text-white">{gate.crowdLevel}</p>
+                      <p className={`text-lg font-bold ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{gate.crowdLevel}</p>
                       <span className={`rounded-full px-3 py-1 text-xs font-semibold ${gate.crowdLevel === 'high' ? 'bg-rose-500/20 text-rose-200' : gate.crowdLevel === 'medium' ? 'bg-amber-500/20 text-amber-200' : 'bg-emerald-500/20 text-emerald-200'}`}>
                         {gate.crowdLevel.toUpperCase()}
                       </span>

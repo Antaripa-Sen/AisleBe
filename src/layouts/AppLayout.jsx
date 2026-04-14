@@ -28,7 +28,7 @@ export default function AppLayout() {
           <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(14,165,233,0.4)]">
              <span className="text-white font-bold text-xl leading-none">A</span>
           </div>
-          <span className="hidden lg:block ml-4 text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">AisleBe</span>
+          <span className={`hidden lg:block ml-4 text-xl font-extrabold tracking-tight bg-clip-text text-transparent ${theme === 'light' ? 'bg-gradient-to-r from-slate-900 via-slate-700 to-slate-600' : 'bg-gradient-to-r from-white to-slate-400'}`}>AisleBe</span>
         </div>
 
         <div className="flex-1 px-4 lg:px-6 space-y-2 mt-4">
